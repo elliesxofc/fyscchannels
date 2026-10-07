@@ -1,0 +1,15 @@
+{
+  "name": "fyscchannels",
+  "version": "1.0.0",
+  "description": "FYSC channel list, live subcount, and grinding tools -- fysc.lilianax.lol",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.7.2",
+    "cors": "^2.8.5",
+    "express": "^4.18.1"
+  }
+}
