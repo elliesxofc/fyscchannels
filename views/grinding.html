@@ -651,6 +651,8 @@
     <form class="auth-form" id="authForm">
       <input type="password" id="authPasswordInput" placeholder="Password" autocomplete="current-password" minlength="6" required>
       <input type="password" id="authConfirmInput" placeholder="Confirm password" autocomplete="new-password" minlength="6" style="display:none;">
+      <p class="auth-hint" id="captchaQuestionLabel" style="margin:0;">Quick check: what's <strong id="captchaQuestion">...</strong>?</p>
+      <input type="text" inputmode="numeric" id="captchaAnswerInput" placeholder="Your answer" autocomplete="off" required>
       <button type="submit" id="authSubmitButton"><i class="fa-solid fa-lock"></i> <span id="authSubmitLabel">Log in</span></button>
     </form>
     <p class="status-line" id="authStatusLine"></p>
@@ -789,6 +791,8 @@
     const authForm = document.getElementById('authForm');
     const authPasswordInput = document.getElementById('authPasswordInput');
     const authConfirmInput = document.getElementById('authConfirmInput');
+    const captchaQuestionEl = document.getElementById('captchaQuestion');
+    const captchaAnswerInput = document.getElementById('captchaAnswerInput');
     const authSubmitButton = document.getElementById('authSubmitButton');
     const authSubmitLabel = document.getElementById('authSubmitLabel');
     const authStatusLine = document.getElementById('authStatusLine');
@@ -1027,6 +1031,28 @@
     // between visits is reflected correctly instead of assumed stale.
     let authMode = 'login';
 
+    // The server signs the expected answer into currentCaptchaToken and
+    // checks it on submit (see /auth/captcha, /auth/login, /auth/signup on
+    // the backend) -- this is just friction against a script blasting
+    // login/signup attempts, not meant to stop a human attacker who's
+    // actually looking at the page.
+    let currentCaptchaToken = null;
+
+    async function refreshCaptcha() {
+      captchaAnswerInput.value = '';
+      try {
+        const response = await fetch(window.FYSC_API_BASE + '/auth/captcha');
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const data = await response.json();
+        currentCaptchaToken = data.token;
+        captchaQuestionEl.textContent = data.question;
+      } catch (err) {
+        console.error('Captcha fetch failed:', err);
+        currentCaptchaToken = null;
+        captchaQuestionEl.textContent = '?';
+      }
+    }
+
     async function showAuthView(channel) {
       selectedChannel = channel;
       setAvatar(authAvatar, channel);
@@ -1038,6 +1064,7 @@
       authStatusLine.textContent = '';
       authStatusLine.className = 'status-line';
       authSubmitButton.disabled = false;
+      refreshCaptcha();
 
       pickerView.style.display = 'none';
       grindPanel.style.display = 'none';
@@ -1080,6 +1107,11 @@
         authStatusLine.className = 'status-line err';
         return;
       }
+      if (!captchaAnswerInput.value.trim()) {
+        authStatusLine.textContent = 'Answer the question above first.';
+        authStatusLine.className = 'status-line err';
+        return;
+      }
 
       authSubmitButton.disabled = true;
       authStatusLine.textContent = authMode === 'signup' ? 'Setting password...' : 'Logging in...';
@@ -1090,14 +1122,37 @@
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: password })
+          body: JSON.stringify({
+            password: password,
+            captchaToken: currentCaptchaToken,
+            captchaAnswer: captchaAnswerInput.value.trim()
+          })
         });
         const text = await response.text();
+
+        if (response.status === 400) {
+          // Wrong answer or the 60s captcha expired -- either way, a fresh
+          // question is needed before trying again.
+          authStatusLine.textContent = text || 'Security check failed. Try the new question.';
+          authStatusLine.className = 'status-line err';
+          authSubmitButton.disabled = false;
+          refreshCaptcha();
+          return;
+        }
+
+        if (response.status === 429) {
+          authStatusLine.textContent = text || 'Too many attempts -- try again later.';
+          authStatusLine.className = 'status-line err';
+          authSubmitButton.disabled = false;
+          refreshCaptcha();
+          return;
+        }
 
         if (!response.ok) {
           authStatusLine.textContent = text || 'Something went wrong.';
           authStatusLine.className = 'status-line err';
           authSubmitButton.disabled = false;
+          refreshCaptcha();
           return;
         }
 
