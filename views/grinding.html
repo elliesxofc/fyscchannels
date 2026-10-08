@@ -376,6 +376,94 @@
       opacity: 0.6;
     }
 
+    /* ---------- auth view ---------- */
+
+    .auth-form {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 4px 0 6px;
+    }
+
+    .auth-form input {
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .auth-form input::placeholder {
+      color: var(--text-dim);
+    }
+
+    .auth-form input:focus {
+      border-color: var(--pink);
+    }
+
+    .auth-form button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--pink-deep), var(--pink));
+      color: #fff;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: filter 0.2s ease;
+    }
+
+    .auth-form button:hover:not(:disabled) {
+      filter: brightness(1.1);
+    }
+
+    .auth-form button:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .auth-hint {
+      font-size: 12px;
+      color: var(--text-dim);
+      text-align: center;
+      margin: 0 0 4px;
+    }
+
+    .panel-header-row {
+      align-self: stretch;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .panel-header-row .change-channel {
+      margin-bottom: 0;
+    }
+
+    .logout-link {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      transition: color 0.2s ease;
+    }
+
+    .logout-link:hover {
+      color: var(--pink-soft);
+    }
+
     .section-label {
       align-self: flex-start;
       margin: 0 0 10px;
@@ -553,9 +641,27 @@
     <p class="empty-state" id="emptyState" style="display: none;">No channels found.</p>
   </div>
 
+  <!-- auth view -->
+  <div class="grind-panel" id="authView">
+    <button class="change-channel" id="authChangeChannelBtn"><i class="fa-solid fa-arrow-left"></i> Change channel</button>
+    <div class="avatar" id="authAvatar"></div>
+    <p class="channel-name" id="authChannelName"></p>
+    <p class="auth-hint" id="authHint">Checking this channel...</p>
+
+    <form class="auth-form" id="authForm">
+      <input type="password" id="authPasswordInput" placeholder="Password" autocomplete="current-password" minlength="6" required>
+      <input type="password" id="authConfirmInput" placeholder="Confirm password" autocomplete="new-password" minlength="6" style="display:none;">
+      <button type="submit" id="authSubmitButton"><i class="fa-solid fa-lock"></i> <span id="authSubmitLabel">Log in</span></button>
+    </form>
+    <p class="status-line" id="authStatusLine"></p>
+  </div>
+
   <!-- grind view -->
   <div class="grind-panel" id="grindPanel">
-    <button class="change-channel" id="changeChannelBtn"><i class="fa-solid fa-arrow-left"></i> Change channel</button>
+    <div class="panel-header-row">
+      <button class="change-channel" id="changeChannelBtn"><i class="fa-solid fa-arrow-left"></i> Change channel</button>
+      <button class="logout-link" id="logoutBtn"><i class="fa-solid fa-right-from-bracket"></i> Log out</button>
+    </div>
     <div class="avatar" id="grindAvatar"></div>
     <p class="channel-name" id="grindName"></p>
     <p class="channel-subs" id="grindSubs"></p>
@@ -597,16 +703,19 @@
     // Fetched straight from fysca's public, keyless endpoint (see config.js).
     const DATA_ENDPOINT = window.FYSC_DATA_URL;
 
-    // Same generic GET /post/:cid/:type/:gain route the deployed Nightbot
-    // "2" commands already hit behind the scenes (e.g. "!ad2" does
-    // FCData[cid].estSubGain += random(0, 45000)). Each entry below mirrors
-    // one of those commands' real gain numbers, so clicking a button here
-    // has the exact same effect !ad2 typing in chat would. The server
-    // enforces its own 5s-per-command-per-channel cooldown regardless of
-    // what this page does, so no new backend code is needed for any of
-    // these to work safely.
+    // /web/post/:cid/:type/:gain -- same effect as the generic /post route
+    // the deployed Nightbot "2" commands hit directly (e.g. "!ad2" does
+    // FCData[cid].estSubGain += random(0, 45000)), but gated behind a login
+    // for this cid (see requireAuthToken below). Nightbot's own commands
+    // keep hitting the plain /post route, which is untouched and still
+    // open -- this page is the only thing that needs a login to use /web/.
+    // Each entry below mirrors one of those commands' real gain numbers, so
+    // clicking a button here has the exact same effect !ad2 typing in chat
+    // would. The server enforces its own 5s-per-command-per-channel
+    // cooldown regardless of what this page does.
     function commandUrl(cid, type, gain) {
-      return window.FYSC_API_BASE + '/post/' + encodeURIComponent(cid) + '/' + encodeURIComponent(type) + '/' + gain;
+      return window.FYSC_API_BASE + '/web/post/' + encodeURIComponent(cid) + '/' + encodeURIComponent(type) + '/' + gain +
+        '?token=' + encodeURIComponent(getStoredToken(cid) || '');
     }
 
     // :type strings match the real deployed URLs exactly (some are
@@ -653,11 +762,37 @@
     ];
 
     const STORAGE_KEY = 'fysc_grind_cid';
+    const TOKEN_KEY_PREFIX = 'fysc_grind_token_';
+
+    // One password-only login per channel (no username -- the channel's
+    // own cid is the identity). Tokens are issued by the server for one
+    // specific cid and rejected if replayed against another, so they're
+    // stored per-cid here too rather than as one shared value.
+    function getStoredToken(cid) {
+      try { return localStorage.getItem(TOKEN_KEY_PREFIX + cid); } catch (e) { return null; }
+    }
+    function setStoredToken(cid, token) {
+      try { localStorage.setItem(TOKEN_KEY_PREFIX + cid, token); } catch (e) { /* ignore */ }
+    }
+    function clearStoredToken(cid) {
+      try { localStorage.removeItem(TOKEN_KEY_PREFIX + cid); } catch (e) { /* ignore */ }
+    }
 
     let allChannels = [];
     let selectedChannel = null;
 
     const pickerView = document.getElementById('pickerView');
+    const authView = document.getElementById('authView');
+    const authAvatar = document.getElementById('authAvatar');
+    const authChannelName = document.getElementById('authChannelName');
+    const authHint = document.getElementById('authHint');
+    const authForm = document.getElementById('authForm');
+    const authPasswordInput = document.getElementById('authPasswordInput');
+    const authConfirmInput = document.getElementById('authConfirmInput');
+    const authSubmitButton = document.getElementById('authSubmitButton');
+    const authSubmitLabel = document.getElementById('authSubmitLabel');
+    const authStatusLine = document.getElementById('authStatusLine');
+    const logoutBtn = document.getElementById('logoutBtn');
     const grindPanel = document.getElementById('grindPanel');
     const loading = document.getElementById('loading');
     const emptyState = document.getElementById('emptyState');
@@ -799,6 +934,14 @@
           return;
         }
 
+        if (response.status === 401 || response.status === 403) {
+          clearStoredToken(selectedChannel.cid);
+          btn.disabled = false;
+          setStatus('Your login expired. Log in again.', 'err');
+          showAuthView(selectedChannel);
+          return;
+        }
+
         if (text.indexOf('not in the system') !== -1) {
           setStatus("This channel isn't registered yet.", 'err');
           btn.disabled = false;
@@ -847,10 +990,24 @@
     const boostLabel = document.getElementById('boostLabel');
     boostButton.addEventListener('click', () => doCommand(BOOST_COMMAND, boostButton, boostLabel));
 
+    // Picking a channel no longer drops straight into the grind panel --
+    // every channel needs a password-only login (no username; the cid is
+    // the identity) before its boost/rename controls become reachable. A
+    // stored token skips straight back in optimistically; if it's actually
+    // stale, the first /web/ call that gets a 401 bounces back to the auth
+    // view anyway (see doCommand/doRename).
     function selectChannel(channel) {
       selectedChannel = channel;
       localStorage.setItem(STORAGE_KEY, channel.cid);
 
+      if (getStoredToken(channel.cid)) {
+        revealGrindPanel(channel);
+      } else {
+        showAuthView(channel);
+      }
+    }
+
+    function revealGrindPanel(channel) {
       setAvatar(grindAvatar, channel);
       grindName.textContent = channel.cname;
       grindSubs.textContent = formatNumber(channel.subscriberCountRealAPI) + ' subscribers';
@@ -860,18 +1017,121 @@
       statusLine.className = 'status-line';
 
       pickerView.style.display = 'none';
+      authView.style.display = 'none';
       grindPanel.style.display = 'flex';
     }
+
+    // 'login' once /auth/status/:cid says the channel already has a
+    // password, 'signup' if it's unclaimed -- decided fresh every time a
+    // channel is picked, so someone else claiming a channel's password
+    // between visits is reflected correctly instead of assumed stale.
+    let authMode = 'login';
+
+    async function showAuthView(channel) {
+      selectedChannel = channel;
+      setAvatar(authAvatar, channel);
+      authChannelName.textContent = channel.cname;
+      authHint.textContent = 'Checking this channel...';
+      authPasswordInput.value = '';
+      authConfirmInput.value = '';
+      authConfirmInput.style.display = 'none';
+      authStatusLine.textContent = '';
+      authStatusLine.className = 'status-line';
+      authSubmitButton.disabled = false;
+
+      pickerView.style.display = 'none';
+      grindPanel.style.display = 'none';
+      authView.style.display = 'flex';
+
+      try {
+        const response = await fetch(window.FYSC_API_BASE + '/auth/status/' + encodeURIComponent(channel.cid));
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const data = await response.json();
+
+        if (data.hasPassword) {
+          authMode = 'login';
+          authHint.textContent = 'This channel already has a password set — log in to grind it.';
+          authSubmitLabel.textContent = 'Log in';
+          authConfirmInput.style.display = 'none';
+        } else {
+          authMode = 'signup';
+          authHint.textContent = "No password set yet for this channel — set one to claim it. Anyone who knows it can grind this channel, so keep it to yourself.";
+          authSubmitLabel.textContent = 'Set password';
+          authConfirmInput.style.display = 'block';
+        }
+      } catch (err) {
+        console.error('Auth status check failed:', err);
+        authHint.textContent = "Couldn't reach the server to check this channel. Try again.";
+      }
+    }
+
+    authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!selectedChannel) return;
+
+      const password = authPasswordInput.value;
+      if (password.length < 6) {
+        authStatusLine.textContent = 'Password must be at least 6 characters.';
+        authStatusLine.className = 'status-line err';
+        return;
+      }
+      if (authMode === 'signup' && password !== authConfirmInput.value) {
+        authStatusLine.textContent = "Passwords don't match.";
+        authStatusLine.className = 'status-line err';
+        return;
+      }
+
+      authSubmitButton.disabled = true;
+      authStatusLine.textContent = authMode === 'signup' ? 'Setting password...' : 'Logging in...';
+      authStatusLine.className = 'status-line wait';
+
+      try {
+        const url = window.FYSC_API_BASE + '/auth/' + authMode + '/' + encodeURIComponent(selectedChannel.cid);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: password })
+        });
+        const text = await response.text();
+
+        if (!response.ok) {
+          authStatusLine.textContent = text || 'Something went wrong.';
+          authStatusLine.className = 'status-line err';
+          authSubmitButton.disabled = false;
+          return;
+        }
+
+        const data = JSON.parse(text);
+        setStoredToken(selectedChannel.cid, data.token);
+        revealGrindPanel(selectedChannel);
+      } catch (err) {
+        console.error('Auth request failed:', err);
+        authStatusLine.textContent = "Couldn't reach the server. Try again.";
+        authStatusLine.className = 'status-line err';
+        authSubmitButton.disabled = false;
+      }
+    });
+
+    document.getElementById('authChangeChannelBtn').addEventListener('click', () => {
+      authView.style.display = 'none';
+      pickerView.style.display = 'block';
+    });
 
     document.getElementById('changeChannelBtn').addEventListener('click', () => {
       grindPanel.style.display = 'none';
       pickerView.style.display = 'block';
     });
 
-    // Mirrors !rename2 -- GET /rename/:cid?to=... (fysca_devasset/server.js:3413).
-    // CORS-open and ungated (no cooldown on this one server-side), so this is a
-    // plain fire-and-confirm action rather than the disable/cooldown pattern
-    // the gain commands use.
+    logoutBtn.addEventListener('click', () => {
+      if (selectedChannel) clearStoredToken(selectedChannel.cid);
+      grindPanel.style.display = 'none';
+      pickerView.style.display = 'block';
+    });
+
+    // Mirrors /rename/:cid?to=... (fysca_devasset/server.js), but through
+    // the /web/rename/:cid counterpart that requires a login token for this
+    // cid -- the plain /rename/:cid route is untouched and still open for
+    // anything else that already hits it directly.
     async function doRename() {
       if (!selectedChannel) return;
       const newName = renameInput.value.trim();
@@ -884,9 +1144,17 @@
       setStatus('Renaming...', 'wait');
 
       try {
-        const url = window.FYSC_API_BASE + '/rename/' + encodeURIComponent(selectedChannel.cid) +
-          '?to=' + encodeURIComponent(newName);
+        const url = window.FYSC_API_BASE + '/web/rename/' + encodeURIComponent(selectedChannel.cid) +
+          '?to=' + encodeURIComponent(newName) + '&token=' + encodeURIComponent(getStoredToken(selectedChannel.cid) || '');
         const response = await fetch(url);
+
+        if (response.status === 401 || response.status === 403) {
+          clearStoredToken(selectedChannel.cid);
+          setStatus('Your login expired. Log in again.', 'err');
+          showAuthView(selectedChannel);
+          return;
+        }
+
         if (!response.ok) throw new Error('HTTP ' + response.status);
 
         // The backend only applies renamedTo for 24-char (standard YouTube)
