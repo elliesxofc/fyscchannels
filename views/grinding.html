@@ -438,6 +438,44 @@
       margin: 0 0 4px;
     }
 
+    .claim-box {
+      width: 100%;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      margin: 4px 0 6px;
+    }
+
+    .claim-code {
+      margin: 0;
+      padding: 10px 16px;
+      border-radius: 12px;
+      border: 1px dashed var(--pink);
+      background: rgba(255, 255, 255, 0.05);
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 18px;
+      letter-spacing: 1px;
+      color: var(--text);
+      user-select: all;
+    }
+
+    .claim-copy,
+    .auth-link {
+      border: none;
+      background: none;
+      color: var(--text-dim);
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .claim-copy:hover,
+    .auth-link:hover {
+      color: var(--pink);
+    }
+
     .panel-header-row {
       align-self: stretch;
       display: flex;
@@ -649,12 +687,21 @@
     <p class="auth-hint" id="authHint">Checking this channel...</p>
 
     <form class="auth-form" id="authForm">
-      <input type="password" id="authPasswordInput" placeholder="Password" autocomplete="current-password" minlength="6" required>
-      <input type="password" id="authConfirmInput" placeholder="Confirm password" autocomplete="new-password" minlength="6" style="display:none;">
+      <input type="password" id="authPasswordInput" placeholder="Password" autocomplete="current-password" minlength="6">
+      <input type="password" id="authConfirmInput" placeholder="Confirm password" autocomplete="new-password" minlength="6">
       <p class="auth-hint" id="captchaQuestionLabel" style="margin:0;">Quick check: what's <strong id="captchaQuestion">...</strong>?</p>
-      <input type="text" inputmode="numeric" id="captchaAnswerInput" placeholder="Your answer" autocomplete="off" required>
+      <input type="text" inputmode="numeric" id="captchaAnswerInput" placeholder="Your answer" autocomplete="off">
       <button type="submit" id="authSubmitButton"><i class="fa-solid fa-lock"></i> <span id="authSubmitLabel">Log in</span></button>
     </form>
+
+    <div class="claim-box" id="claimBox">
+      <p class="auth-hint" style="margin:0;">While signed in to YouTube <strong>as this channel</strong>, type this in the FYSC live chat:</p>
+      <p class="claim-code" id="claimCommand">!claim2 ......</p>
+      <button type="button" class="claim-copy" id="claimCopyBtn"><i class="fa-regular fa-copy"></i> Copy</button>
+      <p class="auth-hint" id="claimWaitHint" style="margin:0;">Waiting for your message...</p>
+    </div>
+
+    <button type="button" class="auth-link" id="authReclaimLink">Not your password, or forgot it? Re-claim through live chat</button>
     <p class="status-line" id="authStatusLine"></p>
   </div>
 
@@ -669,7 +716,7 @@
     <p class="channel-subs" id="grindSubs"></p>
 
     <div class="rename-row">
-      <input type="text" id="renameInput" class="rename-input" placeholder="New display name..." maxlength="64">
+      <input type="text" id="renameInput" class="rename-input" placeholder="New display name..." maxlength="60">
       <button id="renameButton" class="rename-button" type="button"><i class="fa-solid fa-pen"></i> Rename</button>
     </div>
 
@@ -708,16 +755,21 @@
     // /web/post/:cid/:type/:gain -- same effect as the generic /post route
     // the deployed Nightbot "2" commands hit directly (e.g. "!ad2" does
     // FCData[cid].estSubGain += random(0, 45000)), but gated behind a login
-    // for this cid (see requireAuthToken below). Nightbot's own commands
-    // keep hitting the plain /post route, which is untouched and still
-    // open -- this page is the only thing that needs a login to use /web/.
+    // for this cid (see requireChannelAuth on the backend). Nightbot's own
+    // commands keep hitting the plain /post route, which is gated by a shared
+    // command key instead once one is configured on the server.
     // Each entry below mirrors one of those commands' real gain numbers, so
     // clicking a button here has the exact same effect !ad2 typing in chat
     // would. The server enforces its own 5s-per-command-per-channel
     // cooldown regardless of what this page does.
     function commandUrl(cid, type, gain) {
-      return window.FYSC_API_BASE + '/web/post/' + encodeURIComponent(cid) + '/' + encodeURIComponent(type) + '/' + gain +
-        '?token=' + encodeURIComponent(getStoredToken(cid) || '');
+      return window.FYSC_API_BASE + '/web/post/' + encodeURIComponent(cid) + '/' + encodeURIComponent(type) + '/' + gain;
+    }
+
+    // The login token goes in a header rather than the URL, so it doesn't
+    // end up in server/proxy access logs or browser history.
+    function authHeaders(cid) {
+      return { Authorization: 'Bearer ' + (getStoredToken(cid) || '') };
     }
 
     // :type strings match the real deployed URLs exactly (some are
@@ -796,6 +848,12 @@
     const authSubmitButton = document.getElementById('authSubmitButton');
     const authSubmitLabel = document.getElementById('authSubmitLabel');
     const authStatusLine = document.getElementById('authStatusLine');
+    const authReclaimLink = document.getElementById('authReclaimLink');
+    const captchaQuestionLabel = document.getElementById('captchaQuestionLabel');
+    const claimBox = document.getElementById('claimBox');
+    const claimCommand = document.getElementById('claimCommand');
+    const claimCopyBtn = document.getElementById('claimCopyBtn');
+    const claimWaitHint = document.getElementById('claimWaitHint');
     const logoutBtn = document.getElementById('logoutBtn');
     const grindPanel = document.getElementById('grindPanel');
     const loading = document.getElementById('loading');
@@ -927,7 +985,7 @@
       setStatus('Sending ' + cmd.label + '...', 'wait');
 
       try {
-        const response = await fetch(commandUrl(selectedChannel.cid, cmd.type, cmd.gain));
+        const response = await fetch(commandUrl(selectedChannel.cid, cmd.type, cmd.gain), { headers: authHeaders(selectedChannel.cid) });
         const text = await response.text();
 
         if (response.status === 429) {
@@ -1025,17 +1083,28 @@
       grindPanel.style.display = 'flex';
     }
 
-    // 'login' once /auth/status/:cid says the channel already has a
-    // password, 'signup' if it's unclaimed -- decided fresh every time a
-    // channel is picked, so someone else claiming a channel's password
-    // between visits is reflected correctly instead of assumed stale.
+    // Which step of the auth view is showing:
+    //   'login'          -- channel has a password; password + captcha.
+    //   'claim-start'    -- captcha only; gets a !claim2 code from the server.
+    //   'claim-wait'     -- shows the code, polls until the channel's owner
+    //                       types it in live chat.
+    //   'claim-password' -- ownership proven; choose the password.
+    // Setting a password always goes through the claim steps. The server
+    // only accepts one when the channel itself typed the code in live chat
+    // (see /auth/claim/* in fysca_devasset/server.js), so picking a channel
+    // first no longer means owning it. The same steps re-claim a channel
+    // that already has a password, which replaces it and logs out every
+    // earlier login.
     let authMode = 'login';
+    let currentClaimToken = null;
+    let claimPollTimer = null;
+    const CLAIM_POLL_MS = 3000;
 
     // The server signs the expected answer into currentCaptchaToken and
-    // checks it on submit (see /auth/captcha, /auth/login, /auth/signup on
-    // the backend) -- this is just friction against a script blasting
-    // login/signup attempts, not meant to stop a human attacker who's
-    // actually looking at the page.
+    // checks it on submit (see /auth/captcha, /auth/login, /auth/claim/start
+    // on the backend) -- this is just friction against a script blasting
+    // attempts, not meant to stop a human attacker who's actually looking
+    // at the page.
     let currentCaptchaToken = null;
 
     async function refreshCaptcha() {
@@ -1053,18 +1122,92 @@
       }
     }
 
-    async function showAuthView(channel) {
-      selectedChannel = channel;
-      setAvatar(authAvatar, channel);
-      authChannelName.textContent = channel.cname;
-      authHint.textContent = 'Checking this channel...';
+    function setAuthStatus(text, kind) {
+      authStatusLine.textContent = text;
+      authStatusLine.className = 'status-line' + (kind ? ' ' + kind : '');
+    }
+
+    function stopClaimPolling() {
+      clearTimeout(claimPollTimer);
+      claimPollTimer = null;
+    }
+
+    // Shows only the inputs the given step needs. Hidden inputs also drop
+    // `required`, otherwise the browser refuses to submit the form.
+    function setAuthMode(mode) {
+      authMode = mode;
+      stopClaimPolling();
+      const showPassword = mode === 'login' || mode === 'claim-password';
+      const showConfirm = mode === 'claim-password';
+      const showCaptcha = mode === 'login' || mode === 'claim-start';
+
+      authForm.style.display = mode === 'claim-wait' ? 'none' : 'flex';
+      claimBox.style.display = mode === 'claim-wait' ? 'flex' : 'none';
+      authReclaimLink.style.display = mode === 'login' ? 'block' : 'none';
+
+      authPasswordInput.style.display = showPassword ? 'block' : 'none';
+      authPasswordInput.required = showPassword;
+      authPasswordInput.autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+      authConfirmInput.style.display = showConfirm ? 'block' : 'none';
+      authConfirmInput.required = showConfirm;
+      captchaQuestionLabel.style.display = showCaptcha ? 'block' : 'none';
+      captchaAnswerInput.style.display = showCaptcha ? 'block' : 'none';
+      captchaAnswerInput.required = showCaptcha;
+
       authPasswordInput.value = '';
       authConfirmInput.value = '';
-      authConfirmInput.style.display = 'none';
-      authStatusLine.textContent = '';
-      authStatusLine.className = 'status-line';
       authSubmitButton.disabled = false;
-      refreshCaptcha();
+      if (showCaptcha) refreshCaptcha();
+
+      if (mode === 'login') {
+        authHint.textContent = 'This channel already has a password set — log in to grind it.';
+        authSubmitLabel.textContent = 'Log in';
+      } else if (mode === 'claim-start') {
+        authHint.textContent = "To set this channel's password, prove it's yours by typing a code in the FYSC live chat from this channel.";
+        authSubmitLabel.textContent = 'Get claim code';
+      } else if (mode === 'claim-wait') {
+        authHint.textContent = 'Almost there — prove this channel is yours.';
+      } else if (mode === 'claim-password') {
+        authHint.textContent = "Verified! Choose a password. Anyone who knows it can grind this channel, so keep it to yourself.";
+        authSubmitLabel.textContent = 'Set password';
+      }
+    }
+
+    async function pollClaimStatus() {
+      if (authMode !== 'claim-wait' || !selectedChannel || !currentClaimToken) return;
+      try {
+        const response = await fetch(window.FYSC_API_BASE + '/auth/claim/status/' + encodeURIComponent(selectedChannel.cid) +
+          '?claimToken=' + encodeURIComponent(currentClaimToken));
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const data = await response.json();
+        if (authMode !== 'claim-wait') return; // left this step while the request was in flight
+        if (data.verified) {
+          setAuthMode('claim-password');
+          setAuthStatus('Channel verified.', 'ok');
+          return;
+        }
+        if (data.expired) {
+          setAuthMode('claim-start');
+          setAuthStatus('That code expired. Get a new one.', 'err');
+          return;
+        }
+      } catch (err) {
+        console.error('Claim status check failed:', err);
+      }
+      claimPollTimer = setTimeout(pollClaimStatus, CLAIM_POLL_MS);
+    }
+
+    async function showAuthView(channel) {
+      selectedChannel = channel;
+      currentClaimToken = null;
+      stopClaimPolling();
+      setAvatar(authAvatar, channel);
+      authChannelName.textContent = channel.cname;
+      setAuthStatus('');
+      authForm.style.display = 'none';
+      claimBox.style.display = 'none';
+      authReclaimLink.style.display = 'none';
+      authHint.textContent = 'Checking this channel...';
 
       pickerView.style.display = 'none';
       grindPanel.style.display = 'none';
@@ -1074,22 +1217,34 @@
         const response = await fetch(window.FYSC_API_BASE + '/auth/status/' + encodeURIComponent(channel.cid));
         if (!response.ok) throw new Error('HTTP ' + response.status);
         const data = await response.json();
-
-        if (data.hasPassword) {
-          authMode = 'login';
-          authHint.textContent = 'This channel already has a password set — log in to grind it.';
-          authSubmitLabel.textContent = 'Log in';
-          authConfirmInput.style.display = 'none';
-        } else {
-          authMode = 'signup';
-          authHint.textContent = "No password set yet for this channel — set one to claim it. Anyone who knows it can grind this channel, so keep it to yourself.";
-          authSubmitLabel.textContent = 'Set password';
-          authConfirmInput.style.display = 'block';
-        }
+        if (selectedChannel !== channel) return; // picked another channel meanwhile
+        setAuthMode(data.hasPassword ? 'login' : 'claim-start');
       } catch (err) {
         console.error('Auth status check failed:', err);
         authHint.textContent = "Couldn't reach the server to check this channel. Try again.";
       }
+    }
+
+    // Shared error handling for every auth POST. Returns the parsed JSON on
+    // success, or null after showing the error.
+    async function postAuth(path, body) {
+      const response = await fetch(window.FYSC_API_BASE + path + '/' + encodeURIComponent(selectedChannel.cid), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const text = await response.text();
+      if (response.ok) return JSON.parse(text);
+
+      setAuthStatus(text || 'Something went wrong.', 'err');
+      authSubmitButton.disabled = false;
+      if (authMode === 'login' || authMode === 'claim-start') refreshCaptcha();
+      // An expired or already-used claim can't be retried, so start the claim over.
+      if (authMode === 'claim-password' && response.status === 403 && /expired/i.test(text)) {
+        setAuthMode('claim-start');
+        setAuthStatus(text, 'err');
+      }
+      return null;
     }
 
     authForm.addEventListener('submit', async (e) => {
@@ -1097,77 +1252,72 @@
       if (!selectedChannel) return;
 
       const password = authPasswordInput.value;
-      if (password.length < 6) {
-        authStatusLine.textContent = 'Password must be at least 6 characters.';
-        authStatusLine.className = 'status-line err';
-        return;
+      if (authMode === 'login' || authMode === 'claim-password') {
+        if (password.length < 6) return setAuthStatus('Password must be at least 6 characters.', 'err');
       }
-      if (authMode === 'signup' && password !== authConfirmInput.value) {
-        authStatusLine.textContent = "Passwords don't match.";
-        authStatusLine.className = 'status-line err';
-        return;
+      if (authMode === 'claim-password' && password !== authConfirmInput.value) {
+        return setAuthStatus("Passwords don't match.", 'err');
       }
-      if (!captchaAnswerInput.value.trim()) {
-        authStatusLine.textContent = 'Answer the question above first.';
-        authStatusLine.className = 'status-line err';
-        return;
+      if ((authMode === 'login' || authMode === 'claim-start') && !captchaAnswerInput.value.trim()) {
+        return setAuthStatus('Answer the question above first.', 'err');
       }
 
       authSubmitButton.disabled = true;
-      authStatusLine.textContent = authMode === 'signup' ? 'Setting password...' : 'Logging in...';
-      authStatusLine.className = 'status-line wait';
+      const captcha = { captchaToken: currentCaptchaToken, captchaAnswer: captchaAnswerInput.value.trim() };
 
       try {
-        const url = window.FYSC_API_BASE + '/auth/' + authMode + '/' + encodeURIComponent(selectedChannel.cid);
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            password: password,
-            captchaToken: currentCaptchaToken,
-            captchaAnswer: captchaAnswerInput.value.trim()
-          })
-        });
-        const text = await response.text();
-
-        if (response.status === 400) {
-          // Wrong answer or the 60s captcha expired -- either way, a fresh
-          // question is needed before trying again.
-          authStatusLine.textContent = text || 'Security check failed. Try the new question.';
-          authStatusLine.className = 'status-line err';
-          authSubmitButton.disabled = false;
-          refreshCaptcha();
+        if (authMode === 'claim-start') {
+          setAuthStatus('Getting a claim code...', 'wait');
+          const data = await postAuth('/auth/claim/start', captcha);
+          if (!data) return;
+          currentClaimToken = data.claimToken;
+          claimCommand.textContent = '!claim2 ' + data.code;
+          claimWaitHint.textContent = 'Waiting for your message... (code expires in ' + Math.round(data.expiresInSeconds / 60) + ' minutes)';
+          setAuthMode('claim-wait');
+          setAuthStatus('');
+          claimPollTimer = setTimeout(pollClaimStatus, CLAIM_POLL_MS);
           return;
         }
 
-        if (response.status === 429) {
-          authStatusLine.textContent = text || 'Too many attempts -- try again later.';
-          authStatusLine.className = 'status-line err';
-          authSubmitButton.disabled = false;
-          refreshCaptcha();
+        if (authMode === 'claim-password') {
+          setAuthStatus('Setting password...', 'wait');
+          const data = await postAuth('/auth/signup', { password: password, claimToken: currentClaimToken });
+          if (!data) return;
+          currentClaimToken = null;
+          setStoredToken(selectedChannel.cid, data.token);
+          revealGrindPanel(selectedChannel);
           return;
         }
 
-        if (!response.ok) {
-          authStatusLine.textContent = text || 'Something went wrong.';
-          authStatusLine.className = 'status-line err';
-          authSubmitButton.disabled = false;
-          refreshCaptcha();
-          return;
-        }
-
-        const data = JSON.parse(text);
+        setAuthStatus('Logging in...', 'wait');
+        const data = await postAuth('/auth/login', Object.assign({ password: password }, captcha));
+        if (!data) return;
         setStoredToken(selectedChannel.cid, data.token);
         revealGrindPanel(selectedChannel);
       } catch (err) {
         console.error('Auth request failed:', err);
-        authStatusLine.textContent = "Couldn't reach the server. Try again.";
-        authStatusLine.className = 'status-line err';
+        setAuthStatus("Couldn't reach the server. Try again.", 'err');
         authSubmitButton.disabled = false;
       }
     });
 
+    authReclaimLink.addEventListener('click', () => {
+      setAuthMode('claim-start');
+      setAuthStatus('');
+    });
+
+    claimCopyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(claimCommand.textContent);
+        claimCopyBtn.innerHTML = '<i class="fa-solid fa-check"></i> Copied';
+      } catch (e) {
+        claimCopyBtn.textContent = 'Select the text above to copy it';
+      }
+      setTimeout(() => { claimCopyBtn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy'; }, 2000);
+    });
+
     document.getElementById('authChangeChannelBtn').addEventListener('click', () => {
+      stopClaimPolling();
       authView.style.display = 'none';
       pickerView.style.display = 'block';
     });
@@ -1185,8 +1335,8 @@
 
     // Mirrors /rename/:cid?to=... (fysca_devasset/server.js), but through
     // the /web/rename/:cid counterpart that requires a login token for this
-    // cid -- the plain /rename/:cid route is untouched and still open for
-    // anything else that already hits it directly.
+    // cid. The plain /rename/:cid route only takes the shared command key
+    // (when one is configured), never a channel login.
     async function doRename() {
       if (!selectedChannel) return;
       const newName = renameInput.value.trim();
@@ -1200,8 +1350,8 @@
 
       try {
         const url = window.FYSC_API_BASE + '/web/rename/' + encodeURIComponent(selectedChannel.cid) +
-          '?to=' + encodeURIComponent(newName) + '&token=' + encodeURIComponent(getStoredToken(selectedChannel.cid) || '');
-        const response = await fetch(url);
+          '?to=' + encodeURIComponent(newName);
+        const response = await fetch(url, { headers: authHeaders(selectedChannel.cid) });
 
         if (response.status === 401 || response.status === 403) {
           clearStoredToken(selectedChannel.cid);
