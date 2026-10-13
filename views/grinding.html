@@ -476,6 +476,32 @@
       color: var(--pink);
     }
 
+    .claim-google {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .google-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border: 1px solid var(--card-border);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.2s ease;
+    }
+
+    .google-btn:hover {
+      border-color: var(--pink);
+    }
+
     .panel-header-row {
       align-self: stretch;
       display: flex;
@@ -698,6 +724,10 @@
       <p class="auth-hint" style="margin:0;">While signed in to YouTube <strong>as this channel</strong>, type this in the FYSC live chat:</p>
       <p class="claim-code" id="claimCommand">!claim2 ......</p>
       <button type="button" class="claim-copy" id="claimCopyBtn"><i class="fa-regular fa-copy"></i> Copy</button>
+      <div class="claim-google" id="claimGoogle">
+        <p class="auth-hint" style="margin:0;">or</p>
+        <button type="button" class="google-btn" id="claimGoogleBtn"><i class="fa-brands fa-google"></i> Verify with Google instead</button>
+      </div>
       <p class="auth-hint" id="claimWaitHint" style="margin:0;">Waiting for your message...</p>
     </div>
 
@@ -752,18 +782,24 @@
     // Fetched straight from fysca's public, keyless endpoint (see config.js).
     const DATA_ENDPOINT = window.FYSC_DATA_URL;
 
-    // /web/post/:cid/:type/:gain -- same effect as the generic /post route
-    // the deployed Nightbot "2" commands hit directly (e.g. "!ad2" does
+    // POST /web/post/:cid { type, gain } -- same effect as the generic /post
+    // route the deployed Nightbot "2" commands hit directly (e.g. "!ad2" does
     // FCData[cid].estSubGain += random(0, 45000)), but gated behind a login
     // for this cid (see requireChannelAuth on the backend). Nightbot's own
     // commands keep hitting the plain /post route, which is gated by a shared
     // command key instead once one is configured on the server.
+    // type/gain go in the body rather than the URL -- viewers who opened the
+    // Network tab while a button was clicked could otherwise read e.g.
+    // ".../boost/50000" straight off the request, which gives away that the
+    // count was just manually bumped. The server's GAIN_COMMANDS table is
+    // still what actually decides the amount either way; :gain here is only
+    // for display/cooldown bookkeeping on this page.
     // Each entry below mirrors one of those commands' real gain numbers, so
     // clicking a button here has the exact same effect !ad2 typing in chat
     // would. The server enforces its own 5s-per-command-per-channel
     // cooldown regardless of what this page does.
-    function commandUrl(cid, type, gain) {
-      return window.FYSC_API_BASE + '/web/post/' + encodeURIComponent(cid) + '/' + encodeURIComponent(type) + '/' + gain;
+    function commandUrl(cid) {
+      return window.FYSC_API_BASE + '/web/post/' + encodeURIComponent(cid);
     }
 
     // The login token goes in a header rather than the URL, so it doesn't
@@ -854,6 +890,8 @@
     const claimCommand = document.getElementById('claimCommand');
     const claimCopyBtn = document.getElementById('claimCopyBtn');
     const claimWaitHint = document.getElementById('claimWaitHint');
+    const claimGoogle = document.getElementById('claimGoogle');
+    const claimGoogleBtn = document.getElementById('claimGoogleBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     const grindPanel = document.getElementById('grindPanel');
     const loading = document.getElementById('loading');
@@ -985,7 +1023,11 @@
       setStatus('Sending ' + cmd.label + '...', 'wait');
 
       try {
-        const response = await fetch(commandUrl(selectedChannel.cid, cmd.type, cmd.gain), { headers: authHeaders(selectedChannel.cid) });
+        const response = await fetch(commandUrl(selectedChannel.cid), {
+          method: 'POST',
+          headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders(selectedChannel.cid)),
+          body: JSON.stringify({ type: cmd.type, gain: cmd.gain })
+        });
         const text = await response.text();
 
         if (response.status === 429) {
@@ -1272,7 +1314,8 @@
           if (!data) return;
           currentClaimToken = data.claimToken;
           claimCommand.textContent = '!claim2 ' + data.code;
-          claimWaitHint.textContent = 'Waiting for your message... (code expires in ' + Math.round(data.expiresInSeconds / 60) + ' minutes)';
+          claimWaitHint.textContent = 'Waiting for verification... (code expires in ' + Math.round(data.expiresInSeconds / 60) + ' minutes)';
+          refreshGoogleAvailability();
           setAuthMode('claim-wait');
           setAuthStatus('');
           claimPollTimer = setTimeout(pollClaimStatus, CLAIM_POLL_MS);
@@ -1304,6 +1347,29 @@
     authReclaimLink.addEventListener('click', () => {
       setAuthMode('claim-start');
       setAuthStatus('');
+    });
+
+    // "Verify with Google" is a second way to prove the claim: the popup has
+    // the server check which channel the chosen Google account owns, and on
+    // a match marks this claim verified -- the same thing !claim2 does -- so
+    // pollClaimStatus picks it up and moves on with no extra wiring. The
+    // button only shows when the server has Google set up.
+    async function refreshGoogleAvailability() {
+      claimGoogle.style.display = 'none';
+      try {
+        const response = await fetch(window.FYSC_API_BASE + '/auth/google/enabled');
+        const data = await response.json();
+        if (data.enabled && authMode === 'claim-wait') claimGoogle.style.display = 'flex';
+      } catch (e) {
+        // leave it hidden; !claim2 still works
+      }
+    }
+
+    claimGoogleBtn.addEventListener('click', () => {
+      if (!currentClaimToken) return;
+      const popup = window.open(window.FYSC_API_BASE + '/auth/google/start?claimToken=' + encodeURIComponent(currentClaimToken),
+        'fyscGoogleVerify', 'width=500,height=650');
+      if (!popup) setAuthStatus('Your browser blocked the popup. Allow popups for this site and try again.', 'err');
     });
 
     claimCopyBtn.addEventListener('click', async () => {
