@@ -164,9 +164,17 @@
       filter: brightness(1.1);
     }
 
+    /* body is a centered column flexbox, so without an explicit width this
+       wrapper shrink-wraps to the grid's widest layout (all 1100px of it)
+       and gets centered past both edges of a phone screen. */
+    #pickerView {
+      width: 100%;
+      max-width: 1100px;
+    }
+
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
       gap: 14px;
       width: 100%;
       max-width: 1100px;
