@@ -697,14 +697,16 @@
       color: #fff;
     }
 
-    .other-commands {
+    .other-commands,
+    .latest-updates {
       align-self: stretch;
       margin-top: 26px;
       padding-top: 20px;
       border-top: 1px solid var(--card-border);
     }
 
-    .other-commands ul {
+    .other-commands ul,
+    .latest-updates ul {
       margin: 0;
       padding-left: 18px;
       font-size: 12px;
@@ -712,7 +714,8 @@
       line-height: 1.6;
     }
 
-    .other-commands strong {
+    .other-commands strong,
+    .latest-updates strong {
       color: var(--text);
     }
   </style>
@@ -814,6 +817,17 @@
         <li><strong>add</strong> — registers a channel. Not needed here: picking a channel above already means it's registered.</li>
         <li><strong>growth</strong> — checks a channel's current growth rate. Not wired up on the website yet (the backend route it reads from isn't open to other sites yet).</li>
         <li><strong>subcount</strong> — checks a channel's subscriber count. Already shown above once you pick a channel.</li>
+      </ul>
+    </div>
+
+    <!-- Bump the version and put the newest change at the top on each update. -->
+    <div class="latest-updates">
+      <p class="section-label">Latest updates (1.1)</p>
+      <ul>
+        <li><strong>Grind time limit</strong> — each channel gets 12 hours of grinding in any 24 hours. Time left shows under the subscriber count.</li>
+        <li><strong>Shared cooldown</strong> — sending a command locks all the command buttons until its cooldown ends. Boost keeps its own 5-minute cooldown.</li>
+        <li><strong>Quick checks</strong> — a short math question now and then while grinding, to stop macros.</li>
+        <li><strong>Safer claiming</strong> — claiming or re-claiming a channel now needs proof you own it, through live chat or Google.</li>
       </ul>
     </div>
   </div>
