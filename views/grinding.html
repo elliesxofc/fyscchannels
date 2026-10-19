@@ -325,9 +325,19 @@
     }
 
     .grind-panel .channel-subs {
-      margin: 0 0 18px;
+      margin: 0 0 4px;
       font-size: 13px;
       color: var(--text-dim);
+    }
+
+    .grind-panel .grind-time {
+      margin: 0 0 18px;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .grind-panel .grind-time.out {
+      color: var(--down);
     }
 
     .rename-row {
@@ -766,6 +776,7 @@
     <div class="avatar" id="grindAvatar"></div>
     <p class="channel-name" id="grindName"></p>
     <p class="channel-subs" id="grindSubs"></p>
+    <p class="grind-time" id="grindTimeLeft"></p>
 
     <div class="rename-row">
       <input type="text" id="renameInput" class="rename-input" placeholder="New display name..." maxlength="60">
@@ -930,6 +941,7 @@
     const grindAvatar = document.getElementById('grindAvatar');
     const grindName = document.getElementById('grindName');
     const grindSubs = document.getElementById('grindSubs');
+    const grindTimeLeft = document.getElementById('grindTimeLeft');
     const renameInput = document.getElementById('renameInput');
     const renameButton = document.getElementById('renameButton');
     const boostButton = document.getElementById('boostButton');
@@ -1026,34 +1038,160 @@
       statusLine.className = 'status-line' + (kind ? ' ' + kind : '');
     }
 
-    // Counts a cooldown down on the specific button that was clicked, so
-    // the rest stay usable -- the server's cooldown bucket is keyed per
-    // command-type-per-channel (see cooldownFor/cooldownByType), not
-    // shared across different commands.
-    function startButtonCooldown(btn, labelEl, seconds) {
-      clearInterval(btn._cooldownTimer);
-      let remaining = seconds;
-      btn.disabled = true;
-      const originalLabel = btn.dataset.label;
-      const tick = () => {
-        labelEl.textContent = remaining > 0 ? remaining + 's' : originalLabel;
-        if (remaining <= 0) {
-          clearInterval(btn._cooldownTimer);
-          btn.disabled = false;
-          labelEl.textContent = originalLabel;
-        }
-        remaining -= 1;
-      };
-      tick();
-      btn._cooldownTimer = setInterval(tick, 1000);
+    // Every content/Halloween button shares one lock: sending any of them
+    // disables the whole grid until that command's cooldown runs out, with
+    // the countdown shown on the button that was clicked. Boost keeps its
+    // own separate lock. The server's cooldown is only per command type, so
+    // this is deliberately stricter -- it stops cycling through every
+    // button back to back.
+    const boostLabel = document.getElementById('boostLabel');
+    const gridButtons = [];
+    const gridLock = { until: 0, inFlight: false, btn: null, labelEl: null };
+    const boostLock = { until: 0, inFlight: false, btn: null, labelEl: null };
+
+    function lockFor(cmd) {
+      return cmd === BOOST_COMMAND ? boostLock : gridLock;
     }
+
+    function lockSecondsLeft(lock) {
+      return Math.max(0, Math.ceil((lock.until - Date.now()) / 1000));
+    }
+
+    function formatWait(seconds) {
+      return seconds >= 60 ? Math.floor(seconds / 60) + 'm ' + (seconds % 60) + 's' : seconds + 's';
+    }
+
+    function startCooldown(lock, btn, labelEl, seconds) {
+      if (lock.btn && lock.btn !== btn) lock.labelEl.textContent = lock.btn.dataset.label;
+      lock.until = Date.now() + seconds * 1000;
+      lock.btn = btn;
+      lock.labelEl = labelEl;
+      refreshCommandButtons();
+    }
+
+    // Single source of truth for whether each command button is usable:
+    // a request in flight, its lock's cooldown, or no grind time left.
+    function refreshCommandButtons() {
+      const outOfTime = !!selectedChannel && grindTimeLeftMs(selectedChannel.cid, Date.now()) <= 0;
+      [gridLock, boostLock].forEach(lock => {
+        if (!lock.btn) return;
+        const wait = lockSecondsLeft(lock);
+        lock.labelEl.textContent = wait > 0 ? formatWait(wait) : lock.btn.dataset.label;
+        if (wait === 0) lock.btn = null;
+      });
+      const gridBlocked = outOfTime || gridLock.inFlight || lockSecondsLeft(gridLock) > 0;
+      gridButtons.forEach(b => { b.disabled = gridBlocked; });
+      boostButton.disabled = outOfTime || boostLock.inFlight || lockSecondsLeft(boostLock) > 0;
+    }
+
+    // Rolling 24h grind-time cap per channel, tracked in this browser. Time
+    // counts while the grind panel is open, the tab is visible, and a
+    // command went through in the last minute -- leaving the page open idle
+    // uses none of it. Usage is kept as [startMs, endMs] intervals, oldest
+    // first, and anything older than 24h stops counting.
+    // NOTE: the server doesn't know about this cap, so it's a page-side
+    // limit only -- clearing site data, another browser, or calling the API
+    // directly all get around it until the backend enforces the same thing.
+    const GRIND_LIMIT_MS = 12 * 60 * 60 * 1000;
+    const GRIND_WINDOW_MS = 24 * 60 * 60 * 1000;
+    const GRIND_ACTIVE_MS = 60 * 1000;
+    const GRIND_USAGE_KEY_PREFIX = 'fysc_grind_usage_';
+    const grindUsageByCid = {};
+    let lastGrindActivity = 0;
+    let lastGrindTick = Date.now();
+
+    function getGrindUsage(cid, now) {
+      if (!grindUsageByCid[cid]) {
+        let usage = [];
+        try {
+          const raw = JSON.parse(localStorage.getItem(GRIND_USAGE_KEY_PREFIX + cid) || '[]');
+          if (Array.isArray(raw)) usage = raw.filter(r => Array.isArray(r) && r.length === 2);
+        } catch (e) { /* ignore */ }
+        grindUsageByCid[cid] = usage;
+      }
+      const windowStart = now - GRIND_WINDOW_MS;
+      grindUsageByCid[cid] = grindUsageByCid[cid].filter(([, end]) => end > windowStart);
+      return grindUsageByCid[cid];
+    }
+
+    function saveGrindUsage(cid) {
+      try { localStorage.setItem(GRIND_USAGE_KEY_PREFIX + cid, JSON.stringify(grindUsageByCid[cid] || [])); } catch (e) { /* ignore */ }
+    }
+
+    function grindTimeLeftMs(cid, now) {
+      const windowStart = now - GRIND_WINDOW_MS;
+      const used = getGrindUsage(cid, now).reduce((sum, [start, end]) => sum + (end - Math.max(start, windowStart)), 0);
+      return Math.max(0, GRIND_LIMIT_MS - used);
+    }
+
+    // Once the cap is hit, the oldest counted second is the first to age
+    // out of the 24h window.
+    function grindFreesUpInMs(cid, now) {
+      const usage = getGrindUsage(cid, now);
+      if (!usage.length) return 0;
+      return Math.max(usage[0][0], now - GRIND_WINDOW_MS) + GRIND_WINDOW_MS - now;
+    }
+
+    function formatDuration(ms) {
+      const totalMinutes = Math.floor(ms / 60000);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      if (hours > 0) return hours + 'h ' + minutes + 'm';
+      if (minutes > 0) return minutes + 'm';
+      return '<1m';
+    }
+
+    function outOfGrindTimeMessage(cid, now) {
+      return 'Out of grind time (rolling 24h) — more frees up in ' + formatDuration(grindFreesUpInMs(cid, now)) + '.';
+    }
+
+    function renderGrindTimeLeft(now) {
+      if (!selectedChannel) return;
+      const left = grindTimeLeftMs(selectedChannel.cid, now);
+      grindTimeLeft.classList.toggle('out', left <= 0);
+      grindTimeLeft.textContent = left > 0
+        ? 'Grind time left (rolling 24h): ' + formatDuration(left)
+        : outOfGrindTimeMessage(selectedChannel.cid, now);
+    }
+
+    function accrueGrindTime(now) {
+      const elapsed = Math.min(now - lastGrindTick, 2000);
+      lastGrindTick = now;
+      if (!selectedChannel || grindPanel.style.display !== 'flex' || document.hidden) return;
+      if (now - lastGrindActivity > GRIND_ACTIVE_MS || elapsed <= 0) return;
+
+      const cid = selectedChannel.cid;
+      if (grindTimeLeftMs(cid, now) <= 0) return;
+      const usage = getGrindUsage(cid, now);
+      const start = now - elapsed;
+      const last = usage[usage.length - 1];
+      if (last && last[1] >= start - 100) {
+        last[1] = now;
+      } else {
+        usage.push([start, now]);
+      }
+      saveGrindUsage(cid);
+    }
+
+    setInterval(() => {
+      const now = Date.now();
+      accrueGrindTime(now);
+      if (grindPanel.style.display === 'flex') renderGrindTimeLeft(now);
+      refreshCommandButtons();
+    }, 1000);
 
     async function doCommand(cmd, btn, labelEl) {
       if (!selectedChannel || btn.disabled) return;
+      const lock = lockFor(cmd);
+      if (grindTimeLeftMs(selectedChannel.cid, Date.now()) <= 0) {
+        setStatus(outOfGrindTimeMessage(selectedChannel.cid, Date.now()), 'err');
+        return;
+      }
       btn.classList.remove('punch');
       void btn.offsetWidth; // restart the punch animation on repeat clicks
       btn.classList.add('punch');
-      btn.disabled = true;
+      lock.inFlight = true;
+      refreshCommandButtons();
       setStatus('Sending ' + cmd.label + '...', 'wait');
 
       try {
@@ -1066,7 +1204,6 @@
 
         // The server's anti-macro check wants a human answer first.
         if (response.status === 428) {
-          btn.disabled = false;
           setStatus('Quick check needed before you can keep grinding.', 'wait');
           showGrindCheck();
           return;
@@ -1078,13 +1215,12 @@
           // Either this command's own cooldown or the per-minute cap
           // across all commands -- the server's text says which.
           setStatus(text.indexOf('Too many') !== -1 ? text : cmd.label + ' is on cooldown — try again in ' + wait + 's', 'wait');
-          startButtonCooldown(btn, labelEl, wait);
+          startCooldown(lock, btn, labelEl, wait);
           return;
         }
 
         if (response.status === 401 || response.status === 403) {
           clearStoredToken(selectedChannel.cid);
-          btn.disabled = false;
           setStatus('Your login expired. Log in again.', 'err');
           showAuthView(selectedChannel);
           return;
@@ -1092,22 +1228,23 @@
 
         if (text.indexOf('not in the system') !== -1) {
           setStatus("This channel isn't registered yet.", 'err');
-          btn.disabled = false;
           return;
         }
 
         if (!response.ok) {
           setStatus('Something went wrong. Try again.', 'err');
-          btn.disabled = false;
           return;
         }
 
+        lastGrindActivity = Date.now();
         setStatus(cmd.label + ' sent! Watch your live count below.', 'ok');
-        startButtonCooldown(btn, labelEl, cmd.cooldownSeconds || 5);
+        startCooldown(lock, btn, labelEl, cmd.cooldownSeconds || 5);
       } catch (err) {
         console.error('Command request failed:', err);
         setStatus("Couldn't reach the server. Try again.", 'err');
-        btn.disabled = false;
+      } finally {
+        lock.inFlight = false;
+        refreshCommandButtons();
       }
     }
 
@@ -1192,6 +1329,7 @@
       btn.appendChild(name);
       btn.appendChild(hint);
       btn.addEventListener('click', () => doCommand(cmd, btn, name));
+      gridButtons.push(btn);
       return btn;
     }
 
@@ -1199,7 +1337,6 @@
     HALLOWEEN_COMMANDS.forEach(cmd => halloweenGrid.appendChild(createCommandButton(cmd)));
 
     boostButton.dataset.label = 'Boost';
-    const boostLabel = document.getElementById('boostLabel');
     boostButton.addEventListener('click', () => doCommand(BOOST_COMMAND, boostButton, boostLabel));
 
     // Picking a channel no longer drops straight into the grind panel --
@@ -1228,10 +1365,15 @@
       statusLine.textContent = '';
       statusLine.className = 'status-line';
       hideGrindCheck();
+      // Grind time only counts after a command goes through on *this*
+      // channel, not one sent on the previously picked channel.
+      lastGrindActivity = 0;
 
       pickerView.style.display = 'none';
       authView.style.display = 'none';
       grindPanel.style.display = 'flex';
+      renderGrindTimeLeft(Date.now());
+      refreshCommandButtons();
     }
 
     // Which step of the auth view is showing:
