@@ -130,6 +130,26 @@
       filter: brightness(1.1);
     }
 
+    .compare-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: -16px auto 32px;
+      padding: 9px 18px;
+      border: 1.5px solid var(--pink-soft);
+      border-radius: 999px;
+      color: var(--pink-soft);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .compare-link:hover {
+      background: var(--pink-soft);
+      color: #1a0413;
+    }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -269,6 +289,7 @@
     <input type="text" id="searchInput" class="search-bar" placeholder="Search user...">
     <button id="searchButton" class="search-button">Search</button>
   </div>
+  <a class="compare-link" href="/compare"><i class="fa-solid fa-code-compare"></i> Compare two channels</a>
 
   <div class="loading" id="loading"><span class="spinner"></span> Loading channels...</div>
   <div class="grid" id="channelGrid"></div>

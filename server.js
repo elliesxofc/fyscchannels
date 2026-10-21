@@ -57,6 +57,10 @@ app.get('/subs', (req, res) => {
   res.sendFile(path.join(VIEWS_DIR, 'subs.html'));
 });
 
+app.get('/compare', (req, res) => {
+  res.sendFile(path.join(VIEWS_DIR, 'compare.html'));
+});
+
 app.get('/grinding', (req, res) => {
   res.sendFile(path.join(VIEWS_DIR, 'grinding.html'));
 });
