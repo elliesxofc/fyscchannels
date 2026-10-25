@@ -61,6 +61,12 @@ app.get('/compare', (req, res) => {
   res.sendFile(path.join(VIEWS_DIR, 'compare.html'));
 });
 
+app.get('/archive', (req, res) => {
+  res.sendFile(path.join(VIEWS_DIR, 'archive.html'));
+});
+
+app.use('/data', express.static(path.join(VIEWS_DIR, 'data')));
+
 app.get('/grinding', (req, res) => {
   res.sendFile(path.join(VIEWS_DIR, 'grinding.html'));
 });
