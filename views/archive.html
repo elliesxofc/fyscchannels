@@ -373,13 +373,12 @@
   <a class="back-link" href="/"><i class="fa-solid fa-arrow-left"></i> Channels</a>
 
   <p class="ended-badge"><i class="fa-solid fa-flag-checkered"></i> <span id="endedText">Season ended</span></p>
-  <h1>FYSC <span>Season 9</span> Final Results</h1>
+  <h1>FYSC <span>Season 9</span> Archive</h1>
   <p class="subtitle">The archived final subscriber counts, frozen when the season ended</p>
 
   <div class="stats-row" id="statsRow" style="display: none;">
     <div class="stat"><span class="stat-label">Channels</span><span class="stat-value" id="statChannels"></span></div>
     <div class="stat"><span class="stat-label">Total subscribers</span><span class="stat-value" id="statTotal"></span></div>
-    <div class="stat"><span class="stat-label">Champion</span><span class="stat-value" id="statChampion"></span></div>
   </div>
 
   <p class="section-title" id="podiumTitle" style="display: none;">Top 3</p>
@@ -503,7 +502,6 @@
         const total = allChannels.reduce((sum, c) => sum + c.subscribers, 0);
         document.getElementById('statChannels').textContent = formatNumber(allChannels.length);
         document.getElementById('statTotal').textContent = formatNumber(total);
-        document.getElementById('statChampion').textContent = allChannels[0] ? allChannels[0].cname : '—';
         document.getElementById('statsRow').style.display = 'flex';
 
         document.getElementById('podiumGrid').replaceChildren(...allChannels.slice(0, 3).map(createCard));
