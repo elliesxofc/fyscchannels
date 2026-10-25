@@ -49,6 +49,10 @@ app.get('/config.js', (req, res) => {
   res.sendFile(path.join(VIEWS_DIR, 'config.js'));
 });
 
+app.get('/closed.css', (req, res) => {
+  res.sendFile(path.join(VIEWS_DIR, 'closed.css'));
+});
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(VIEWS_DIR, 'index.html'));
 });
