@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="All FYSC Season 9 channels and subscriber counts.">
-  <title>FYSC Season 9 | fysc.lilianax.lol</title>
+  <meta name="description" content="FYSC Channels is closed until the next season.">
+  <title>FYSC Channels | fysc.lilianax.lol</title>
   <link rel="icon" type="image/png" href="https://www.banner.yt/UC6SnTw5Tr3b6IoJhwNsQdvg/avatar" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,6 +31,10 @@
     body {
       margin: 0;
       min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 90px 16px 60px;
       font-family: 'Poppins', 'Helvetica', sans-serif;
       color: var(--text);
       background: radial-gradient(circle at 20% 20%, rgba(255, 95, 176, 0.18), transparent 45%),
@@ -38,10 +42,6 @@
                   linear-gradient(135deg, var(--bg-0), var(--bg-1), var(--bg-2), var(--bg-0));
       background-size: 200% 200%, 200% 200%, 400% 400%;
       animation: gradientShift 22s ease infinite;
-      padding: 90px 20px 60px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
     }
 
     @keyframes gradientShift {
@@ -67,359 +67,100 @@
       color: var(--pink-soft);
     }
 
-    h1 {
-      font-size: clamp(28px, 4vw, 44px);
-      font-weight: 700;
-      margin: 0 0 6px;
+    .card {
+      width: min(520px, 100%);
+      padding: 48px 32px 36px;
+      border-radius: 28px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
       text-align: center;
+    }
+
+    .closed-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      margin-bottom: 18px;
+      border-radius: 50%;
+      background: rgba(255, 95, 176, 0.15);
+      color: var(--pink);
+      font-size: 22px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(24px, 4vw, 32px);
+      font-weight: 700;
+      line-height: 1.3;
     }
 
     h1 span {
       color: var(--pink);
     }
 
-    .subtitle {
-      margin: 0 0 28px;
+    .message {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .signature {
+      margin: 8px 0 30px;
       font-size: 14px;
-      color: var(--text-dim);
-      text-align: center;
-    }
-
-    .search-container {
-      display: flex;
-      width: 100%;
-      max-width: 480px;
-      margin: 0 auto 32px;
-    }
-
-    .search-bar {
-      flex-grow: 1;
-      padding: 13px 18px;
-      border-radius: 999px 0 0 999px;
-      border: 1px solid var(--card-border);
-      border-right: none;
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 14px;
-      outline: none;
-    }
-
-    .search-bar::placeholder {
-      color: var(--text-dim);
-    }
-
-    .search-bar:focus {
-      border-color: var(--pink);
-    }
-
-    .search-button {
-      padding: 13px 22px;
-      border-radius: 0 999px 999px 0;
-      border: none;
-      background: linear-gradient(90deg, var(--pink-deep), var(--pink));
-      color: #fff;
-      font-family: inherit;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: filter 0.2s ease;
-    }
-
-    .search-button:hover {
-      filter: brightness(1.1);
-    }
-
-    .compare-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      margin: -16px auto 32px;
-      padding: 9px 18px;
-      border: 1.5px solid var(--pink-soft);
-      border-radius: 999px;
       color: var(--pink-soft);
-      text-decoration: none;
-      font-size: 13px;
-      font-weight: 600;
-      transition: background 0.2s ease, color 0.2s ease;
+      font-weight: 500;
     }
 
-    .compare-link:hover {
-      background: var(--pink-soft);
-      color: #1a0413;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 16px;
-      width: 100%;
-      max-width: 1400px;
-    }
-
-    .channel-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 20px;
-      backdrop-filter: blur(14px);
-      padding: 16px 18px 20px;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
-      transition: transform 0.2s ease, border-color 0.2s ease;
-    }
-
-    .channel-card:hover {
-      transform: translateY(-3px);
-      border-color: var(--pink-soft);
-    }
-
-    .position {
-      display: inline-block;
-      background: linear-gradient(90deg, var(--pink-deep), var(--pink));
-      color: #fff;
-      font-weight: 700;
-      font-size: 13px;
-      padding: 4px 12px;
-      border-radius: 999px;
-      margin-bottom: 12px;
-    }
-
-    .profile {
+    .button-list {
       display: flex;
-      align-items: center;
+      flex-direction: column;
       gap: 12px;
-      margin-bottom: 10px;
     }
 
-    .avatar {
-      width: 56px;
-      height: 56px;
-      border-radius: 14px;
-      flex-shrink: 0;
+    .fancy-button {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 700;
-      font-size: 20px;
-      color: #fff;
-      background: linear-gradient(135deg, var(--pink-deep), var(--pink-soft));
-      overflow: hidden;
-    }
-
-    .avatar img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .loading {
-      display: none;
-      align-items: center;
       gap: 10px;
-      color: var(--text-dim);
-      font-size: 14px;
-      margin-bottom: 20px;
-    }
-
-    .spinner {
-      width: 18px;
-      height: 18px;
-      border: 2px solid rgba(255, 143, 214, 0.25);
-      border-top-color: var(--pink);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .profile p {
-      margin: 0;
+      padding: 15px 24px;
+      font-size: 15px;
       font-weight: 500;
-      font-size: 16px;
-      line-height: 1.3;
-      word-break: break-word;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 14px;
+      background: linear-gradient(90deg, #7b1fa2, var(--pink-soft));
+      box-shadow: 0 8px 24px rgba(255, 95, 176, 0.25);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
     }
 
-    .subscribers {
-      margin: 0 0 14px;
-      font-size: 13px;
-      color: var(--text-dim);
+    .fancy-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(255, 95, 176, 0.4);
+      filter: brightness(1.08);
     }
 
-    .card-buttons {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .ghost-button {
-      background: transparent;
-      color: var(--pink-soft);
-      border: 1.5px solid var(--pink-soft);
-      border-radius: 999px;
-      padding: 9px 12px;
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s ease, color 0.2s ease;
-    }
-
-    .ghost-button:hover {
-      background: var(--pink-soft);
-      color: #1a0413;
-    }
-
-    .empty-state {
-      color: var(--text-dim);
-      font-size: 14px;
-      margin-top: 20px;
+    .button-archive {
+      background: linear-gradient(90deg, #c98a12, var(--pink));
     }
   </style>
 </head>
 <body>
   <a class="back-link" href="https://lilianax.lol"><i class="fa-solid fa-arrow-left"></i> lilianax.lol</a>
 
-  <h1>All FYSC <span>Season 9</span> Channels</h1>
-  <p class="subtitle">Live subscriber counts, sorted highest to lowest</p>
+  <div class="card">
+    <div class="closed-icon"><i class="fa-solid fa-moon"></i></div>
+    <h1><span>FYSC Channels</span> is now closed</h1>
+    <p class="message">FYSC Channels is now closed for now, see you in the next season!</p>
+    <p class="signature">— Liliana</p>
 
-  <div class="search-container">
-    <input type="text" id="searchInput" class="search-bar" placeholder="Search user...">
-    <button id="searchButton" class="search-button">Search</button>
+    <div class="button-list">
+      <a href="https://tnstats.dev/season1/fyscchannels" class="fancy-button"><i class="fa-solid fa-list"></i> Season 1 Channels</a>
+      <a href="/archive" class="fancy-button button-archive"><i class="fa-solid fa-flag-checkered"></i> Season 9 Final Results</a>
+    </div>
   </div>
-  <a class="compare-link" href="/archive"><i class="fa-solid fa-flag-checkered"></i> Season 9 has ended — see the final results</a>
-  <a class="compare-link" href="/compare"><i class="fa-solid fa-code-compare"></i> Compare two channels</a>
-
-  <div class="loading" id="loading"><span class="spinner"></span> Loading channels...</div>
-  <div class="grid" id="channelGrid"></div>
-  <p class="empty-state" id="emptyState" style="display: none;">No channels found.</p>
-
-  <script src="/config.js"></script>
-  <script>
-    // Fetched straight from fysca's public, keyless endpoint so this page works
-    // as a static file (GitHub Pages) — no keys ever reach the browser.
-    const DATA_ENDPOINT = window.FYSC_DATA_URL;
-
-    let allChannels = [];
-
-    function formatNumber(num) {
-      return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    }
-
-    function initials(name) {
-      return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-    }
-
-    function displayChannels(channels) {
-      const grid = document.getElementById('channelGrid');
-      const emptyState = document.getElementById('emptyState');
-      grid.innerHTML = '';
-
-      if (channels.length === 0) {
-        emptyState.style.display = 'block';
-        return;
-      }
-      emptyState.style.display = 'none';
-
-      channels.forEach((channel, index) => {
-        const card = document.createElement('div');
-        card.className = 'channel-card';
-
-        const position = document.createElement('div');
-        position.className = 'position';
-        position.textContent = `#${index + 1}`;
-
-        const profile = document.createElement('div');
-        profile.className = 'profile';
-
-        const avatar = document.createElement('div');
-        avatar.className = 'avatar';
-        if (channel.cimage) {
-          const img = document.createElement('img');
-          img.src = channel.cimage;
-          img.alt = channel.cname;
-          img.onerror = () => { avatar.textContent = initials(channel.cname); };
-          avatar.appendChild(img);
-        } else {
-          avatar.textContent = initials(channel.cname);
-        }
-
-        const name = document.createElement('p');
-        name.textContent = channel.cname;
-
-        profile.appendChild(avatar);
-        profile.appendChild(name);
-
-        const subscribers = document.createElement('p');
-        subscribers.className = 'subscribers';
-        subscribers.textContent = `Subscribers: ${formatNumber(channel.subscriberCountRealAPI)}`;
-
-        const buttons = document.createElement('div');
-        buttons.className = 'card-buttons';
-
-        const liveSubcountButton = document.createElement('button');
-        liveSubcountButton.className = 'ghost-button';
-        liveSubcountButton.textContent = 'Live Subcount';
-        liveSubcountButton.onclick = () => {
-          window.open(`/subs?fyscChannel=${channel.cid}`, '_blank');
-        };
-
-        const goToChannelButton = document.createElement('button');
-        goToChannelButton.className = 'ghost-button';
-        goToChannelButton.textContent = 'Go to Channel';
-        goToChannelButton.onclick = () => {
-          window.open(`https://youtube.com/channel/${channel.cid}`, '_blank');
-        };
-
-        buttons.appendChild(liveSubcountButton);
-        buttons.appendChild(goToChannelButton);
-
-        card.appendChild(position);
-        card.appendChild(profile);
-        card.appendChild(subscribers);
-        card.appendChild(buttons);
-
-        grid.appendChild(card);
-      });
-    }
-
-    async function loadChannels() {
-      const loading = document.getElementById('loading');
-      const emptyState = document.getElementById('emptyState');
-      loading.style.display = 'flex';
-
-      try {
-        const response = await fetch(DATA_ENDPOINT);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        if (!Array.isArray(data)) throw new Error('Unexpected response shape');
-        allChannels = data
-          .slice()
-          .sort((a, b) => b.subscriberCountRealAPI - a.subscriberCountRealAPI);
-        displayChannels(allChannels);
-      } catch (err) {
-        console.error('Error fetching channels:', err);
-        emptyState.textContent = 'Failed to load channels.';
-        emptyState.style.display = 'block';
-      } finally {
-        loading.style.display = 'none';
-      }
-    }
-
-    function searchChannels() {
-      const query = document.getElementById('searchInput').value.toLowerCase();
-      const filtered = allChannels.filter(channel => channel.cname.toLowerCase().includes(query));
-      displayChannels(filtered);
-    }
-
-    document.getElementById('searchButton').addEventListener('click', searchChannels);
-    document.getElementById('searchInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') searchChannels();
-    });
-
-    loadChannels();
-  </script>
 </body>
 </html>
