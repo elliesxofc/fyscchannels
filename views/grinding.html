@@ -4,8 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Grind your FYSC channel's growth with one click — the website version of the old Nightbot boost commands.">
-  <title>Grinding | fysc.lilianax.lol</title>
+  <title>Season 10 Grinding | fysc.lilianax.lol</title>
   <link rel="icon" type="image/png" href="https://www.banner.yt/UC6SnTw5Tr3b6IoJhwNsQdvg/avatar" />
+  <script>
+    // Season 10 grinding opens Fri Nov 20 2026, 00:00 UTC+8. Until then the
+    // page shows only the closed card (.closed-gate) and reloads itself the
+    // moment the countdown ends. Set here, before anything renders, so the
+    // tools never flash on screen. The grind proxy refuses grinds until the
+    // same moment (CLOSED_UNTIL in its .env), so this isn't the only lock.
+    window.GRIND_OPENS_AT = Date.parse('2026-11-20T00:00:00+08:00');
+    if (Date.now() < window.GRIND_OPENS_AT) document.documentElement.classList.add('is-closed');
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -115,6 +124,80 @@
       color: var(--text-dim);
       text-align: center;
       max-width: 460px;
+    }
+
+    .season-tag {
+      display: inline-block;
+      margin: 0 0 10px;
+      padding: 4px 12px;
+      border: 1px solid var(--card-border);
+      border-radius: 999px;
+      background: rgba(255, 95, 176, 0.12);
+      color: var(--pink-soft);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    /* ---------- closed until opening day ---------- */
+
+    .closed-gate {
+      display: none;
+    }
+    :root.is-closed body > :not(.closed-gate):not(.back-link) {
+      display: none !important;
+    }
+    :root.is-closed .closed-gate {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: 520px;
+      margin-top: 6vh;
+      padding: 40px 28px 34px;
+      border: 1px solid var(--card-border);
+      border-radius: 22px;
+      background: var(--card-bg);
+      text-align: center;
+    }
+    .closed-gate-icon {
+      font-size: 34px;
+      color: var(--pink);
+      margin-bottom: 12px;
+    }
+    .closed-gate .subtitle {
+      margin-bottom: 18px;
+    }
+    .closed-countdown {
+      display: flex;
+      gap: 10px;
+      margin: 4px 0 20px;
+    }
+    .closed-countdown div {
+      min-width: 66px;
+      padding: 10px 6px 8px;
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .closed-countdown b {
+      display: block;
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .closed-countdown small {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .closed-gate .local-time {
+      margin: 0;
+      font-size: 13px;
+      color: var(--text-dim);
     }
 
     /* ---------- picker view ---------- */
@@ -726,6 +809,41 @@
     <i class="fa-solid fa-rotate"></i> Refresh chart
   </button>
 
+  <!-- Shown instead of everything else until GRIND_OPENS_AT (see <head>). -->
+  <div class="closed-gate" role="status">
+    <div class="season-tag">Season 10</div>
+    <div class="closed-gate-icon"><i class="fa-solid fa-moon"></i></div>
+    <h1><span>Grinding</span> opens Friday</h1>
+    <p class="subtitle">Season 10 grinding opens on Friday, November 20 at 12:00 AM (UTC+8). This page opens by itself when the timer runs out.</p>
+    <div class="closed-countdown" aria-live="off">
+      <div><b id="cdDays">--</b><small>Days</small></div>
+      <div><b id="cdHours">--</b><small>Hrs</small></div>
+      <div><b id="cdMins">--</b><small>Min</small></div>
+      <div><b id="cdSecs">--</b><small>Sec</small></div>
+    </div>
+    <p class="local-time" id="cdLocal"></p>
+  </div>
+  <script>
+    (function () {
+      if (!document.documentElement.classList.contains('is-closed')) return;
+      var opensAt = window.GRIND_OPENS_AT;
+      var local = new Date(opensAt).toLocaleString(undefined, { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      document.getElementById('cdLocal').textContent = 'That’s ' + local + ' your time.';
+      function pad(n) { return String(n).padStart(2, '0'); }
+      function tick() {
+        var left = Math.max(0, Math.floor((opensAt - Date.now()) / 1000));
+        if (left === 0) { location.reload(); return; }
+        document.getElementById('cdDays').textContent = pad(Math.floor(left / 86400));
+        document.getElementById('cdHours').textContent = pad(Math.floor(left % 86400 / 3600));
+        document.getElementById('cdMins').textContent = pad(Math.floor(left % 3600 / 60));
+        document.getElementById('cdSecs').textContent = pad(left % 60);
+        setTimeout(tick, 1000 - Date.now() % 1000);
+      }
+      tick();
+    })();
+  </script>
+
+  <div class="season-tag">Season 10</div>
   <h1>Channel <span>Grinding</span></h1>
   <p class="subtitle">Pick your channel below, then use any of the boost commands to grow it — the website version of the old Nightbot "2" commands.</p>
 
