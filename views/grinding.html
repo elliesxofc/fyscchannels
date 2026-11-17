@@ -369,6 +369,25 @@
 
     .rename-row { display: flex; width: 100%; gap: 8px; margin-bottom: 20px; }
 
+    /* grinding method switch (chat / website) */
+    .mode-row { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: -6px 0 20px; text-align: center; }
+    .mode-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      background: var(--surface-2);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .mode-toggle strong { color: var(--text); }
+    .mode-toggle:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+    .mode-toggle:disabled { opacity: 0.6; }
+    .mode-note { margin: 0; font-size: 12px; color: var(--muted); max-width: 440px; }
+    .mode-note.chat { color: var(--warn); }
+
     .section-label {
       align-self: flex-start;
       margin: 22px 0 10px;
@@ -528,6 +547,7 @@
     <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
     <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
     <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M17 3l4 4-4 4M21 7H7M7 21l-4-4 4-4M3 17h14"/></symbol>
     <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-4 3 3 6-6"/></symbol>
     <symbol id="i-google" viewBox="0 0 24 24"><path d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3z"/><path d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path d="M6.4 14a6 6 0 0 1 0-3.9V7.5H3.1a10 10 0 0 0 0 9z"/><path d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.5l3.3 2.6C7.2 7.7 9.4 5.9 12 5.9z"/></symbol>
   </svg>
@@ -629,6 +649,13 @@
     <p class="channel-subs" id="grindSubs"></p>
     <p class="grind-time" id="grindTimeLeft"></p>
 
+    <div class="mode-row">
+      <button class="mode-toggle" id="modeToggle" type="button" aria-describedby="modeNote">
+        <svg class="icon"><use href="#i-swap"/></svg> Grinding method: <strong id="modeLabel">Chat</strong>
+      </button>
+      <p class="mode-note" id="modeNote"></p>
+    </div>
+
     <div class="rename-row">
       <input type="text" id="renameInput" class="input" placeholder="New display name" maxlength="60" aria-label="New display name">
       <button id="renameButton" class="btn secondary" type="button"><svg class="icon"><use href="#i-pen"/></svg> Rename</button>
@@ -669,6 +696,7 @@
     <div class="latest-updates">
       <p class="section-label">Latest updates (1.2)</p>
       <ul>
+        <li><strong>Grinding method</strong> — shows whether a channel grinds from chat or the website. Switching is turned off for now: chat commands and the buttons both work.</li>
         <li><strong>More commands</strong> — Short, Music Video, Phonk, Song, Meme, Moai and Viral (Viral has its own 5-minute cooldown, like Boost).</li>
         <li><strong>Real amounts</strong> — each button now shows the most it can give in Season 10 (commands give a random amount up to half the old number).</li>
         <li><strong>New look</strong> — a cleaner design that follows your device's light or dark mode, and loads much faster.</li>
@@ -952,6 +980,87 @@
     const gridLock = { until: 0, inFlight: false, btn: null, labelEl: null };
     const boostLock = { until: 0, inFlight: false, btn: null, labelEl: null };
 
+    // ---- grinding method: chat or website (ported from the TNStats Web Grind page) ----
+    // With the switch ON, a channel grinds either from chat (the Nightbot
+    // commands) or from these buttons, never both: the server stores the
+    // choice per channel, Chat locks these buttons and Website turns the chat
+    // commands off.
+    // The switch is OFF for now: it shows "Chat", can't be changed, makes no
+    // server calls, and the buttons keep working alongside the chat commands.
+    // To turn it on, set this to true -- but only once the Season 10 FYSC
+    // server has GET /grind-mode/:cid and POST /web/grind-mode/:cid (the
+    // grind proxy already forwards both).
+    const GRIND_MODE_SWITCH_ENABLED = false;
+    let grindMode = 'chat';
+    const modeToggle = document.getElementById('modeToggle');
+    const modeLabel = document.getElementById('modeLabel');
+    const modeNote = document.getElementById('modeNote');
+
+    function setMode(mode) {
+      grindMode = mode === 'website' ? 'website' : 'chat';
+      modeLabel.textContent = grindMode === 'website' ? 'Website' : 'Chat';
+      modeToggle.disabled = !GRIND_MODE_SWITCH_ENABLED;
+      modeToggle.title = GRIND_MODE_SWITCH_ENABLED ? 'Switch between chat and website grinding' : 'Switching is turned off for now';
+      if (!GRIND_MODE_SWITCH_ENABLED) {
+        modeNote.className = 'mode-note';
+        modeNote.textContent = 'Switching is turned off for now. The chat commands and the buttons below both work.';
+      } else if (grindMode === 'website') {
+        modeNote.className = 'mode-note';
+        modeNote.textContent = 'Website grinding is on: use the buttons below. The Nightbot chat commands are turned off for this channel.';
+      } else {
+        modeNote.className = 'mode-note chat';
+        modeNote.textContent = 'Chat grinding is on: use the Nightbot commands in chat. Switch the grinding method to Website to use the buttons below.';
+      }
+      refreshCommandButtons();
+    }
+
+    async function loadMode(channel) {
+      if (!GRIND_MODE_SWITCH_ENABLED) { setMode('chat'); return; }
+      try {
+        const response = await fetch(window.FYSC_API_BASE + '/grind-mode/' + encodeURIComponent(channel.cid));
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const data = await response.json();
+        if (selectedChannel === channel) setMode(data.mode);
+      } catch (e) {
+        console.error('Grinding method lookup failed:', e);
+        if (selectedChannel === channel) setMode('chat');
+      }
+    }
+
+    modeToggle.addEventListener('click', async () => {
+      if (!GRIND_MODE_SWITCH_ENABLED || !selectedChannel) return;
+      const channel = selectedChannel;
+      const wanted = grindMode === 'website' ? 'chat' : 'website';
+      modeToggle.disabled = true;
+      try {
+        const response = await fetch(window.FYSC_API_BASE + '/web/grind-mode/' + encodeURIComponent(channel.cid), {
+          method: 'POST',
+          headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders(channel.cid)),
+          body: JSON.stringify({ mode: wanted })
+        });
+        const text = await response.text();
+        if (response.status === 401 || response.status === 403) {
+          clearStoredToken(channel.cid);
+          setStatus('Your login expired. Log in again.', 'err');
+          showAuthView(channel);
+          return;
+        }
+        if (!response.ok) {
+          setStatus(response.status === 429 ? 'Slow down, try again in a second.' : "Couldn't switch the grinding method. Try again.", 'err');
+          return;
+        }
+        if (selectedChannel === channel) {
+          setMode(JSON.parse(text).mode);
+          setStatus(grindMode === 'website' ? 'Grinding method: Website. The chat commands are now off.' : 'Grinding method: Chat. The buttons are now off.', 'ok');
+        }
+      } catch (e) {
+        console.error('Grinding method switch failed:', e);
+        setStatus("Couldn't reach the server. Try again.", 'err');
+      } finally {
+        modeToggle.disabled = !GRIND_MODE_SWITCH_ENABLED;
+      }
+    });
+
     // Viral's own 5-minute lock (see CONTENT_COMMANDS).
     const viralLock = { until: 0, inFlight: false, btn: null, labelEl: null };
     let viralButton = null;
@@ -987,9 +1096,11 @@
         lock.labelEl.textContent = wait > 0 ? formatWait(wait) : lock.btn.dataset.label;
         if (wait === 0) lock.btn = null;
       });
-      const gridBlocked = outOfTime || gridLock.inFlight || lockSecondsLeft(gridLock) > 0;
+      // Only when the grinding-method switch is turned on: Chat mode locks the buttons.
+      const modeBlocked = GRIND_MODE_SWITCH_ENABLED && grindMode !== 'website';
+      const gridBlocked = outOfTime || modeBlocked || gridLock.inFlight || lockSecondsLeft(gridLock) > 0;
       gridButtons.forEach(b => { b.disabled = gridBlocked; });
-      boostButton.disabled = outOfTime || boostLock.inFlight || lockSecondsLeft(boostLock) > 0;
+      boostButton.disabled = outOfTime || modeBlocked || boostLock.inFlight || lockSecondsLeft(boostLock) > 0;
       // Viral also waits for the shared cooldown (the grind proxy applies it to every non-boost command).
       if (viralButton) viralButton.disabled = gridBlocked || viralLock.inFlight || lockSecondsLeft(viralLock) > 0;
     }
@@ -1153,6 +1264,12 @@
           return;
         }
 
+        if (response.status === 409) {   // the server says this channel is on chat grinding (switch turned on)
+          setMode('chat');
+          setStatus('Chat grinding is on for this channel. Switch the grinding method to Website to use the buttons.', 'err');
+          return;
+        }
+
         if (response.status === 400 && /unknown command/i.test(text)) {
           setStatus(cmd.label + ' isn’t available right now.', 'err');
           return;
@@ -1311,6 +1428,7 @@
       authView.style.display = 'none';
       grindPanel.style.display = 'flex';
       renderGrindTimeLeft(Date.now());
+      loadMode(channel);   // just shows "Chat" while the switch is turned off
       refreshCommandButtons();
     }
 
