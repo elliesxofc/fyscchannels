@@ -637,7 +637,7 @@
     <button class="boost-btn" id="boostButton" type="button">
       <svg class="icon solid"><use href="#i-bolt"/></svg>
       <span id="boostLabel">Boost</span>
-      <span class="sub">5 minute cooldown</span>
+      <span class="sub">up to +25,000 · 5 minute cooldown</span>
     </button>
 
     <p class="section-label">Content commands</p>
@@ -669,6 +669,8 @@
     <div class="latest-updates">
       <p class="section-label">Latest updates (1.2)</p>
       <ul>
+        <li><strong>More commands</strong> — Short, Music Video, Phonk, Song, Meme, Moai and Viral (Viral has its own 5-minute cooldown, like Boost).</li>
+        <li><strong>Real amounts</strong> — each button now shows the most it can give in Season 10 (commands give a random amount up to half the old number).</li>
         <li><strong>New look</strong> — a cleaner design that follows your device's light or dark mode, and loads much faster.</li>
         <li><strong>Live search</strong> — the channel list filters as you type.</li>
         <li><strong>Grind time limit</strong> — each channel gets 12 hours of grinding in any 24 hours. Time left shows under the subscriber count.</li>
@@ -736,8 +738,25 @@
       { type: 'review video', gain: 12500, label: 'Review' },
       { type: 'tour video', gain: 20000, label: 'Tour' },
       { type: 'trending video', gain: 20000, label: 'Trending' },
-      { type: 'video', gain: 7000, label: 'Video' }
+      { type: 'video', gain: 7000, label: 'Video' },
+      // Season 10 additions: the FYSC server's GAIN_COMMANDS has had these
+      // since the season started (chat asked for them), but the page never
+      // showed them. Labels follow the TNStats Web Grind page.
+      { type: 'short', gain: 7000, label: 'Short' },
+      { type: 'music video', gain: 12500, label: 'Music Video' },
+      { type: 'phonk song', gain: 10000, label: 'Phonk' },
+      { type: 'song', gain: 10000, label: 'Song' },
+      { type: 'meme', gain: 12000, label: 'Meme' },
+      { type: 'moai', gain: 5000, label: 'Moai' },
+      // Like boost, the server gives viral its own 5-minute cooldown, so it
+      // gets its own lock: using it doesn't freeze the other buttons for 5 min.
+      { type: 'viral video', gain: 50000, label: 'Viral', cooldownSeconds: 300, ownLock: true }
     ];
+
+    // Season 10 halves every command: the server adds a RANDOM amount from 0
+    // up to gain * GAIN_SCALE (see GAIN_SCALE in the FYSC server.js). The
+    // buttons show that real maximum, not the base number.
+    const GAIN_SCALE = 0.5;
 
     // Real !boost2 (chat-only) enforces its own 5-minute cooldown, separate
     // from the flat 5s floor every other command above shares. This button
@@ -933,8 +952,13 @@
     const gridLock = { until: 0, inFlight: false, btn: null, labelEl: null };
     const boostLock = { until: 0, inFlight: false, btn: null, labelEl: null };
 
+    // Viral's own 5-minute lock (see CONTENT_COMMANDS).
+    const viralLock = { until: 0, inFlight: false, btn: null, labelEl: null };
+    let viralButton = null;
+
     function lockFor(cmd) {
-      return cmd === BOOST_COMMAND ? boostLock : gridLock;
+      if (cmd === BOOST_COMMAND) return boostLock;
+      return cmd.ownLock ? viralLock : gridLock;
     }
 
     function lockSecondsLeft(lock) {
@@ -957,7 +981,7 @@
     // a request in flight, its lock's cooldown, or no grind time left.
     function refreshCommandButtons() {
       const outOfTime = !!selectedChannel && grindTimeLeftMs(selectedChannel.cid, Date.now()) <= 0;
-      [gridLock, boostLock].forEach(lock => {
+      [gridLock, boostLock, viralLock].forEach(lock => {
         if (!lock.btn) return;
         const wait = lockSecondsLeft(lock);
         lock.labelEl.textContent = wait > 0 ? formatWait(wait) : lock.btn.dataset.label;
@@ -966,6 +990,8 @@
       const gridBlocked = outOfTime || gridLock.inFlight || lockSecondsLeft(gridLock) > 0;
       gridButtons.forEach(b => { b.disabled = gridBlocked; });
       boostButton.disabled = outOfTime || boostLock.inFlight || lockSecondsLeft(boostLock) > 0;
+      // Viral also waits for the shared cooldown (the grind proxy applies it to every non-boost command).
+      if (viralButton) viralButton.disabled = gridBlocked || viralLock.inFlight || lockSecondsLeft(viralLock) > 0;
     }
 
     // Rolling 24h grind-time cap per channel, tracked in this browser. Time
@@ -1237,12 +1263,12 @@
 
       const hint = document.createElement('span');
       hint.className = 'command-hint';
-      hint.textContent = '+' + formatNumber(cmd.gain);
+      hint.textContent = 'up to +' + formatNumber(cmd.gain * GAIN_SCALE) + (cmd.cooldownSeconds >= 60 ? ' · ' + Math.round(cmd.cooldownSeconds / 60) + 'm' : '');
 
       btn.appendChild(name);
       btn.appendChild(hint);
       btn.addEventListener('click', () => doCommand(cmd, btn, name));
-      gridButtons.push(btn);
+      if (cmd.ownLock) viralButton = btn; else gridButtons.push(btn);
       return btn;
     }
 
