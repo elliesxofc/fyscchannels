@@ -15,139 +15,147 @@
     window.GRIND_OPENS_AT = Date.parse('2026-11-20T00:00:00+08:00');
     if (Date.now() < window.GRIND_OPENS_AT) document.documentElement.classList.add('is-closed');
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Speed: the API is on another host, so open that connection while the
+       page is still parsing. No web fonts and no icon font -- the system font
+       stack and the inline SVG icons below cost zero extra requests. -->
+  <link rel="preconnect" href="https://grindapi.lilianax.lol" crossorigin>
+  <link rel="dns-prefetch" href="https://yt3.ggpht.com">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0c0c10">
+  <script src="/config.js"></script>
+  <script>
+    // Start downloading the channel list right away, in parallel with the
+    // rest of the page, instead of after the whole script has run.
+    if (!document.documentElement.classList.contains('is-closed') && window.FYSC_DATA_URL) {
+      window.__channelList = fetch(window.FYSC_DATA_URL).catch(function (e) { return e; });
+    }
+  </script>
   <style>
     :root {
-      --pink: #ff5fb0;
-      --pink-soft: #ff9ecb;
-      --pink-deep: #c239b3;
-      --bg-0: #120311;
-      --bg-1: #2b0a20;
-      --bg-2: #4a0e33;
-      --card-bg: rgba(255, 255, 255, 0.04);
-      --card-border: rgba(255, 143, 214, 0.18);
-      --text: #ffe9f5;
-      --text-dim: #d9a8c4;
-      --up: #4ee08a;
-      --down: #ff6b6b;
-      --amber: #ffb24e;
+      --bg: #0c0c10;
+      --surface: #15151b;
+      --surface-2: #1c1c24;
+      --border: #26262f;
+      --border-strong: #363642;
+      --text: #ececf1;
+      --muted: #9b9bab;
+      --accent: #ff5fb0;
+      --accent-ink: #1a0711;
+      --accent-soft: rgba(255, 95, 176, 0.12);
+      --ok: #3ecf8e;
+      --warn: #f5b546;
+      --err: #ff6b6b;
+      --radius: 14px;
+      --radius-sm: 10px;
+      --focus: 0 0 0 3px rgba(255, 95, 176, 0.35);
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f6f6f9;
+        --surface: #ffffff;
+        --surface-2: #f0f0f4;
+        --border: #e3e3ea;
+        --border-strong: #cfcfd9;
+        --text: #16161d;
+        --muted: #62626f;
+        --accent: #d6338a;
+        --accent-ink: #ffffff;
+        --accent-soft: rgba(214, 51, 138, 0.1);
+        --ok: #138a55;
+        --warn: #a86a00;
+        --err: #c93838;
+      }
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: 'Poppins', 'Helvetica', sans-serif;
+      font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       color: var(--text);
-      background: radial-gradient(circle at 20% 20%, rgba(255, 95, 176, 0.18), transparent 45%),
-                  radial-gradient(circle at 80% 75%, rgba(194, 57, 179, 0.22), transparent 50%),
-                  linear-gradient(135deg, var(--bg-0), var(--bg-1), var(--bg-2), var(--bg-0));
-      background-size: 200% 200%, 200% 200%, 400% 400%;
-      animation: gradientShift 22s ease infinite;
-      padding: 90px 20px 60px;
+      background: var(--bg);
+      padding: 76px 16px 56px;
       display: flex;
       flex-direction: column;
       align-items: center;
+      -webkit-font-smoothing: antialiased;
     }
 
-    @keyframes gradientShift {
-      0% { background-position: 0% 0%, 100% 100%, 0% 50%; }
-      50% { background-position: 100% 100%, 0% 0%, 100% 50%; }
-      100% { background-position: 0% 0%, 100% 100%, 0% 50%; }
+    .icon {
+      width: 1em;
+      height: 1em;
+      flex-shrink: 0;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
+    .icon.solid { fill: currentColor; stroke: none; }
 
-    .back-link {
+    button, input { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; }
+    :focus-visible { outline: none; box-shadow: var(--focus); }
+
+    /* ---------- top bar ---------- */
+    .topbar {
       position: fixed;
-      top: 24px;
-      left: 28px;
+      inset: 0 0 auto 0;
+      height: 56px;
       display: flex;
       align-items: center;
-      gap: 6px;
-      color: var(--text-dim);
+      padding: 0 20px;
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      border-bottom: 1px solid var(--border);
+      z-index: 10;
+    }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
       text-decoration: none;
       font-size: 14px;
-      transition: color 0.2s ease;
+      border-radius: 8px;
+      padding: 6px 8px;
+      margin-left: -8px;
     }
+    .back-link:hover { color: var(--text); }
 
-    .back-link:hover {
-      color: var(--pink-soft);
-    }
-
-    .refresh-btn {
-      position: fixed;
-      top: 24px;
-      right: 28px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid var(--card-border);
-      border-radius: 999px;
-      padding: 8px 14px;
-      color: var(--text-dim);
-      font-family: inherit;
-      font-size: 13px;
-      cursor: pointer;
-      transition: color 0.2s ease, border-color 0.2s ease;
-    }
-
-    .refresh-btn:hover:not(:disabled) {
-      color: #fff;
-      border-color: var(--pink-soft);
-    }
-
-    .refresh-btn:disabled {
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
-
-    h1 {
-      font-size: clamp(28px, 4vw, 44px);
-      font-weight: 700;
-      margin: 0 0 6px;
-      text-align: center;
-    }
-
-    h1 span {
-      color: var(--pink);
-    }
-
-    .subtitle {
-      margin: 0 0 28px;
-      font-size: 14px;
-      color: var(--text-dim);
-      text-align: center;
-      max-width: 460px;
-    }
-
+    /* ---------- header ---------- */
     .season-tag {
       display: inline-block;
-      margin: 0 0 10px;
-      padding: 4px 12px;
-      border: 1px solid var(--card-border);
+      margin: 0 0 12px;
+      padding: 3px 10px;
+      border: 1px solid var(--border-strong);
       border-radius: 999px;
-      background: rgba(255, 95, 176, 0.12);
-      color: var(--pink-soft);
+      color: var(--muted);
       font-size: 12px;
       font-weight: 600;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
+    }
+    h1 {
+      font-size: clamp(28px, 4.4vw, 40px);
+      line-height: 1.15;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0 0 8px;
+      text-align: center;
+    }
+    h1 span { color: var(--accent); }
+    .subtitle {
+      margin: 0 0 28px;
+      color: var(--muted);
+      text-align: center;
+      max-width: 480px;
     }
 
     /* ---------- closed until opening day ---------- */
-
-    .closed-gate {
-      display: none;
-    }
-    :root.is-closed body > :not(.closed-gate):not(.back-link) {
-      display: none !important;
-    }
+    .closed-gate { display: none; }
+    :root.is-closed body > :not(.closed-gate):not(.topbar):not(svg) { display: none !important; }
     :root.is-closed .closed-gate {
       display: flex;
       flex-direction: column;
@@ -155,492 +163,220 @@
       width: 100%;
       max-width: 520px;
       margin-top: 6vh;
-      padding: 40px 28px 34px;
-      border: 1px solid var(--card-border);
-      border-radius: 22px;
-      background: var(--card-bg);
+      padding: 36px 24px 30px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: var(--surface);
       text-align: center;
     }
-    .closed-gate-icon {
-      font-size: 34px;
-      color: var(--pink);
-      margin-bottom: 12px;
-    }
-    .closed-gate .subtitle {
-      margin-bottom: 18px;
-    }
-    .closed-countdown {
-      display: flex;
-      gap: 10px;
-      margin: 4px 0 20px;
-    }
+    .closed-gate-icon { font-size: 30px; color: var(--accent); margin-bottom: 10px; display: flex; }
+    .closed-gate .subtitle { margin-bottom: 20px; }
+    .closed-countdown { display: flex; gap: 8px; margin: 0 0 18px; }
     .closed-countdown div {
-      min-width: 66px;
+      min-width: 64px;
       padding: 10px 6px 8px;
-      border: 1px solid var(--card-border);
-      border-radius: 14px;
-      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface-2);
     }
     .closed-countdown b {
       display: block;
       font-size: 26px;
       font-weight: 700;
-      color: var(--text);
       font-variant-numeric: tabular-nums;
     }
     .closed-countdown small {
       font-size: 11px;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--text-dim);
+      color: var(--muted);
     }
-    .closed-gate .local-time {
-      margin: 0;
-      font-size: 13px;
-      color: var(--text-dim);
-    }
+    .closed-gate .local-time { margin: 0; font-size: 13px; color: var(--muted); }
 
-    /* ---------- picker view ---------- */
-
+    /* ---------- picker ---------- */
+    #pickerView { width: 100%; max-width: 1080px; }
     .search-container {
-      display: flex;
+      position: relative;
       width: 100%;
       max-width: 480px;
-      margin: 0 auto 28px;
+      margin: 0 auto 24px;
     }
-
+    .search-container .icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+    }
     .search-bar {
-      flex-grow: 1;
-      padding: 13px 18px;
-      border-radius: 999px 0 0 999px;
-      border: 1px solid var(--card-border);
-      border-right: none;
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 14px;
-      outline: none;
-    }
-
-    .search-bar::placeholder {
-      color: var(--text-dim);
-    }
-
-    .search-bar:focus {
-      border-color: var(--pink);
-    }
-
-    .search-button {
-      padding: 13px 22px;
-      border-radius: 0 999px 999px 0;
-      border: none;
-      background: linear-gradient(90deg, var(--pink-deep), var(--pink));
-      color: #fff;
-      font-family: inherit;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: filter 0.2s ease;
-    }
-
-    .search-button:hover {
-      filter: brightness(1.1);
-    }
-
-    /* body is a centered column flexbox, so without an explicit width this
-       wrapper shrink-wraps to the grid's widest layout (all 1100px of it)
-       and gets centered past both edges of a phone screen. */
-    #pickerView {
       width: 100%;
-      max-width: 1100px;
+      padding: 12px 16px 12px 40px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 15px;
     }
+    .search-bar::placeholder { color: var(--muted); }
+    .search-bar:focus { border-color: var(--accent); box-shadow: var(--focus); outline: none; }
+    .result-count { margin: -12px 0 14px; text-align: center; font-size: 13px; color: var(--muted); min-height: 20px; }
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
-      gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr));
+      gap: 10px;
       width: 100%;
-      max-width: 1100px;
     }
-
     .pick-card {
       display: flex;
       align-items: center;
       gap: 12px;
-      background: var(--card-bg);
-      border: 1.5px solid var(--card-border);
-      border-radius: 16px;
-      backdrop-filter: blur(14px);
-      padding: 12px 14px;
-      cursor: pointer;
+      min-width: 0;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
       text-align: left;
-      font-family: inherit;
-      color: var(--text);
-      transition: transform 0.2s ease, border-color 0.2s ease;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+      /* skip layout/paint for cards that are off screen */
+      content-visibility: auto;
+      contain-intrinsic-size: auto 68px;
     }
-
-    .pick-card:hover {
-      transform: translateY(-2px);
-      border-color: var(--pink-soft);
+    .pick-card:hover { border-color: var(--border-strong); background: var(--surface-2); }
+    .pick-card .info { min-width: 0; }
+    .pick-card .name {
+      font-weight: 600;
+      font-size: 14px;
+      line-height: 1.3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .pick-card .subs { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .pick-card .cid {
+      font: 11px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+      color: var(--muted);
+      opacity: 0.75;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .avatar {
-      width: 46px;
-      height: 46px;
-      border-radius: 12px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
       flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 700;
-      font-size: 16px;
-      color: #fff;
-      background: linear-gradient(135deg, var(--pink-deep), var(--pink-soft));
+      font-size: 15px;
+      color: var(--accent);
+      background: var(--accent-soft);
       overflow: hidden;
     }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
 
-    .avatar img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
+    .empty-state { color: var(--muted); font-size: 14px; margin-top: 20px; text-align: center; }
+
+    /* skeleton rows while the list loads */
+    .skeleton {
+      height: 66px;
+      border-radius: var(--radius);
+      background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s ease-in-out infinite;
     }
+    @keyframes shimmer { to { background-position: -200% 0; } }
 
-    .pick-card .name {
-      font-weight: 500;
-      font-size: 14px;
-      line-height: 1.3;
-      word-break: break-word;
-    }
-
-    .pick-card .subs {
-      font-size: 12px;
-      color: var(--text-dim);
-      margin-top: 2px;
-    }
-
-    .pick-card .cid {
-      font-size: 10px;
-      color: var(--text-dim);
-      opacity: 0.6;
-      margin-top: 2px;
-      font-family: monospace;
-      word-break: break-all;
-    }
-
-    .loading {
-      display: none;
-      align-items: center;
-      gap: 10px;
-      color: var(--text-dim);
-      font-size: 14px;
-      margin-bottom: 20px;
-    }
-
-    .spinner {
-      width: 18px;
-      height: 18px;
-      border: 2px solid rgba(255, 143, 214, 0.25);
-      border-top-color: var(--pink);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .empty-state {
-      color: var(--text-dim);
-      font-size: 14px;
-      margin-top: 20px;
-      text-align: center;
-    }
-
-    /* ---------- grind view ---------- */
-
+    /* ---------- grind + auth panels ---------- */
     .grind-panel {
       display: none;
       flex-direction: column;
       align-items: center;
       width: 100%;
-      max-width: 620px;
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 24px;
-      backdrop-filter: blur(14px);
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
-      padding: 32px 28px 28px;
+      max-width: 600px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px 24px 28px;
     }
-
-    .change-channel {
-      align-self: flex-start;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 18px;
-      background: none;
-      border: none;
-      color: var(--text-dim);
-      font-family: inherit;
-      font-size: 13px;
-      cursor: pointer;
-      transition: color 0.2s ease;
-    }
-
-    .change-channel:hover {
-      color: var(--pink-soft);
-    }
-
-    .grind-panel .avatar {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      font-size: 24px;
-      border: 3px solid var(--card-border);
-    }
-
-    .grind-panel .channel-name {
-      margin: 12px 0 2px;
-      font-size: 18px;
-      font-weight: 600;
-      text-align: center;
-      word-break: break-word;
-    }
-
-    .grind-panel .channel-subs {
-      margin: 0 0 4px;
-      font-size: 13px;
-      color: var(--text-dim);
-    }
-
-    .grind-panel .grind-time {
-      margin: 0 0 18px;
-      font-size: 12px;
-      color: var(--text-dim);
-    }
-
-    .grind-panel .grind-time.out {
-      color: var(--down);
-    }
-
-    .rename-row {
-      display: flex;
-      width: 100%;
-      gap: 8px;
-      margin-bottom: 22px;
-    }
-
-    .rename-input {
-      flex-grow: 1;
-      min-width: 0;
-      padding: 10px 14px;
-      border-radius: 999px;
-      border: 1px solid var(--card-border);
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 13px;
-      outline: none;
-    }
-
-    .rename-input::placeholder {
-      color: var(--text-dim);
-    }
-
-    .rename-input:focus {
-      border-color: var(--pink);
-    }
-
-    .rename-button {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 10px 16px;
-      border: none;
-      border-radius: 999px;
-      background: linear-gradient(90deg, var(--pink-deep), var(--pink));
-      color: #fff;
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: filter 0.2s ease;
-    }
-
-    .rename-button:hover:not(:disabled) {
-      filter: brightness(1.1);
-    }
-
-    .rename-button:disabled {
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
-
-    /* ---------- auth view ---------- */
-
-    .auth-form {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin: 4px 0 6px;
-    }
-
-    .auth-form input {
-      padding: 10px 14px;
-      border-radius: 999px;
-      border: 1px solid var(--card-border);
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 13px;
-      outline: none;
-    }
-
-    .auth-form input::placeholder {
-      color: var(--text-dim);
-    }
-
-    .auth-form input:focus {
-      border-color: var(--pink);
-    }
-
-    .auth-form button {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 10px 16px;
-      border: none;
-      border-radius: 999px;
-      background: linear-gradient(90deg, var(--pink-deep), var(--pink));
-      color: #fff;
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: filter 0.2s ease;
-    }
-
-    .auth-form button:hover:not(:disabled) {
-      filter: brightness(1.1);
-    }
-
-    .auth-form button:disabled {
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
-
-    .auth-hint {
-      font-size: 12px;
-      color: var(--text-dim);
-      text-align: center;
-      margin: 0 0 4px;
-    }
-
-    .claim-box {
-      width: 100%;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      margin: 4px 0 6px;
-    }
-
-    .claim-code {
-      margin: 0;
-      padding: 10px 16px;
-      border-radius: 12px;
-      border: 1px dashed var(--pink);
-      background: rgba(255, 255, 255, 0.05);
-      font-family: ui-monospace, Consolas, monospace;
-      font-size: 18px;
-      letter-spacing: 1px;
-      color: var(--text);
-      user-select: all;
-    }
-
-    .claim-copy,
-    .auth-link {
-      border: none;
-      background: none;
-      color: var(--text-dim);
-      font-family: inherit;
-      font-size: 12px;
-      cursor: pointer;
-      text-decoration: underline;
-    }
-
-    .claim-copy:hover,
-    .auth-link:hover {
-      color: var(--pink);
-    }
-
-    .claim-google {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .google-btn {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 16px;
-      border: 1px solid var(--card-border);
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 13px;
-      cursor: pointer;
-      transition: border-color 0.2s ease;
-    }
-
-    .google-btn:hover {
-      border-color: var(--pink);
-    }
-
     .panel-header-row {
       align-self: stretch;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
-
-    .panel-header-row .change-channel {
-      margin-bottom: 0;
-    }
-
-    .logout-link {
+    .change-channel, .logout-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border: 1px solid transparent;
+      border-radius: 8px;
       background: none;
-      border: none;
-      color: var(--text-dim);
-      font-family: inherit;
-      font-size: 12px;
-      cursor: pointer;
-      transition: color 0.2s ease;
+      color: var(--muted);
+      font-size: 13px;
     }
+    .change-channel { align-self: flex-start; margin: 0 0 16px -10px; }
+    .panel-header-row .change-channel { margin: 0 0 0 -10px; }
+    .change-channel:hover, .logout-link:hover { color: var(--text); background: var(--surface-2); }
 
-    .logout-link:hover {
-      color: var(--pink-soft);
+    .grind-panel .avatar { width: 72px; height: 72px; font-size: 24px; }
+    .grind-panel .channel-name {
+      margin: 12px 0 2px;
+      font-size: 19px;
+      font-weight: 700;
+      text-align: center;
+      word-break: break-word;
     }
+    .grind-panel .channel-subs { margin: 0 0 2px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .grind-panel .grind-time { margin: 0 0 20px; font-size: 13px; color: var(--muted); }
+    .grind-panel .grind-time.out { color: var(--err); }
+
+    .input {
+      flex-grow: 1;
+      min-width: 0;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg);
+      font-size: 14px;
+    }
+    .input::placeholder { color: var(--muted); }
+    .input:focus { border-color: var(--accent); box-shadow: var(--focus); outline: none; }
+
+    .btn {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 16px;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-size: 14px;
+      font-weight: 600;
+      transition: filter 0.15s ease;
+    }
+    .btn:hover:not(:disabled) { filter: brightness(1.08); }
+    .btn:disabled { opacity: 0.55; }
+    .btn.secondary { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+
+    .rename-row { display: flex; width: 100%; gap: 8px; margin-bottom: 20px; }
 
     .section-label {
       align-self: flex-start;
-      margin: 0 0 10px;
+      margin: 22px 0 10px;
       font-size: 12px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      color: var(--text-dim);
-    }
-
-    .section-label.spaced {
-      margin-top: 22px;
+      color: var(--muted);
     }
 
     .boost-btn {
@@ -651,97 +387,46 @@
       gap: 10px;
       padding: 14px 20px;
       border: none;
-      border-radius: 14px;
-      cursor: pointer;
-      background: linear-gradient(90deg, #c9780b, var(--amber));
-      color: #1a0f00;
-      font-family: inherit;
+      border-radius: var(--radius);
+      background: var(--accent);
+      color: var(--accent-ink);
       font-weight: 700;
-      font-size: 15px;
-      transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
-      box-shadow: 0 8px 24px rgba(255, 178, 78, 0.3);
+      font-size: 16px;
+      transition: filter 0.15s ease, transform 0.1s ease;
     }
-
-    .boost-btn .sub {
-      font-weight: 400;
-      font-size: 12px;
-      opacity: 0.85;
-    }
-
-    .boost-btn:hover:not(:disabled) {
-      transform: translateY(-2px);
-      filter: brightness(1.06);
-    }
-
-    .boost-btn:active:not(:disabled) {
-      transform: scale(0.97);
-    }
-
-    .boost-btn:disabled {
-      cursor: not-allowed;
-      filter: grayscale(0.4) brightness(0.8);
-      box-shadow: none;
-    }
+    .boost-btn .sub { font-weight: 500; font-size: 13px; opacity: 0.8; }
+    .boost-btn:hover:not(:disabled) { filter: brightness(1.08); }
+    .boost-btn:active:not(:disabled) { transform: scale(0.98); }
+    .boost-btn:disabled { opacity: 0.5; }
 
     .command-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
       gap: 8px;
       width: 100%;
     }
-
     .command-btn {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 2px;
+      gap: 1px;
       padding: 10px 8px;
-      border: 1.5px solid var(--card-border);
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.03);
-      color: var(--text);
-      font-family: inherit;
-      cursor: pointer;
-      transition: transform 0.12s ease, border-color 0.2s ease, background 0.2s ease;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
     }
+    .command-btn:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+    .command-btn:active:not(:disabled) { transform: scale(0.96); }
+    .command-btn:disabled { opacity: 0.45; }
+    .command-name { font-size: 14px; font-weight: 600; }
+    .command-hint { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-    .command-btn:hover:not(:disabled) {
-      transform: translateY(-2px);
-      border-color: var(--pink-soft);
-      background: rgba(255, 95, 176, 0.1);
-    }
+    @keyframes punch { 40% { transform: scale(0.92); } }
+    .punch { animation: punch 0.3s ease; }
 
-    .command-btn:active:not(:disabled) {
-      transform: scale(0.95);
-    }
-
-    .command-btn:disabled {
-      cursor: not-allowed;
-      opacity: 0.5;
-    }
-
-    .command-name {
-      font-size: 13px;
-      font-weight: 600;
-    }
-
-    .command-hint {
-      font-size: 10px;
-      color: var(--text-dim);
-    }
-
-    @keyframes punch {
-      0%   { transform: scale(1); }
-      40%  { transform: scale(0.88); }
-      100% { transform: scale(1); }
-    }
-
-    .punch {
-      animation: punch 0.35s ease;
-    }
-
-    /* Shown when the server wants a human check before more grinds (428). */
+    /* human check the server asks for before more grinds (428) */
     .grind-check {
       width: 100%;
       display: none;
@@ -749,70 +434,112 @@
       align-items: center;
       gap: 8px;
       margin-top: 20px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface-2);
     }
+    .grind-check.show { display: flex; }
 
-    .grind-check.show {
-      display: flex;
-    }
-
-    .status-line {
-      margin-top: 20px;
-      min-height: 20px;
-      font-size: 13px;
-      text-align: center;
-    }
-
-    .status-line.ok { color: var(--up); }
-    .status-line.wait { color: var(--text-dim); }
-    .status-line.err { color: var(--down); }
+    .status-line { margin: 18px 0 0; min-height: 22px; font-size: 14px; text-align: center; }
+    .status-line.ok { color: var(--ok); }
+    .status-line.wait { color: var(--muted); }
+    .status-line.err { color: var(--err); }
 
     .live-link {
-      margin-top: 14px;
+      margin-top: 12px;
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      color: var(--pink-soft);
+      color: var(--accent);
       text-decoration: none;
-      font-size: 13px;
+      font-size: 14px;
+      font-weight: 500;
     }
+    .live-link:hover { text-decoration: underline; }
 
-    .live-link:hover {
-      color: #fff;
-    }
-
-    .other-commands,
-    .latest-updates {
+    .other-commands, .latest-updates {
       align-self: stretch;
-      margin-top: 26px;
-      padding-top: 20px;
-      border-top: 1px solid var(--card-border);
+      margin-top: 24px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
     }
-
-    .other-commands ul,
-    .latest-updates ul {
+    .other-commands .section-label, .latest-updates .section-label { margin-top: 0; }
+    .other-commands ul, .latest-updates ul {
       margin: 0;
       padding-left: 18px;
-      font-size: 12px;
-      color: var(--text-dim);
+      font-size: 13px;
+      color: var(--muted);
       line-height: 1.6;
     }
+    .other-commands strong, .latest-updates strong { color: var(--text); }
 
-    .other-commands strong,
-    .latest-updates strong {
-      color: var(--text);
+    /* ---------- auth ---------- */
+    .auth-form { width: 100%; display: flex; flex-direction: column; gap: 10px; margin: 6px 0; }
+    .auth-hint { font-size: 14px; color: var(--muted); text-align: center; margin: 0 0 6px; }
+    .auth-hint strong { color: var(--text); }
+    .claim-box { width: 100%; display: none; flex-direction: column; align-items: center; gap: 8px; margin: 6px 0; }
+    .claim-code {
+      margin: 0;
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px dashed var(--accent);
+      background: var(--bg);
+      font: 18px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+      letter-spacing: 1px;
+      user-select: all;
+    }
+    .claim-copy, .auth-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: none;
+      background: none;
+      color: var(--muted);
+      font-size: 13px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      padding: 4px;
+    }
+    .claim-copy:hover, .auth-link:hover { color: var(--accent); }
+    .claim-google { display: none; flex-direction: column; align-items: center; gap: 8px; }
+
+    @media (max-width: 520px) {
+      body { padding-top: 72px; }
+      .grind-panel { padding: 20px 16px 24px; border-radius: 16px; }
+      .rename-row { flex-wrap: wrap; }
+      .rename-row .btn { width: 100%; }
+      .closed-countdown div { min-width: 56px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
     }
   </style>
 </head>
 <body>
-  <a class="back-link" href="/"><i class="fa-solid fa-arrow-left"></i> Channels</a>
-  <button class="refresh-btn" id="refreshBtn" title="Mirrors !refresh2 -- refreshes the chart for everyone, no channel needed">
-    <i class="fa-solid fa-rotate"></i> Refresh chart
-  </button>
+  <!-- Icon sprite: replaces the Font Awesome stylesheet + web font. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-4 3 3 6-6"/></symbol>
+    <symbol id="i-google" viewBox="0 0 24 24"><path d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3z"/><path d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path d="M6.4 14a6 6 0 0 1 0-3.9V7.5H3.1a10 10 0 0 0 0 9z"/><path d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.5l3.3 2.6C7.2 7.7 9.4 5.9 12 5.9z"/></symbol>
+  </svg>
+
+  <header class="topbar">
+    <a class="back-link" href="/"><svg class="icon"><use href="#i-back"/></svg> Channels</a>
+  </header>
 
   <!-- Shown instead of everything else until GRIND_OPENS_AT (see <head>). -->
   <div class="closed-gate" role="status">
     <div class="season-tag">Season 10</div>
-    <div class="closed-gate-icon"><i class="fa-solid fa-moon"></i></div>
+    <div class="closed-gate-icon"><svg class="icon"><use href="#i-moon"/></svg></div>
     <h1><span>Grinding</span> opens Friday</h1>
     <p class="subtitle">Season 10 grinding opens on Friday, November 20 at 12:00 AM (UTC+8). This page opens by itself when the timer runs out.</p>
     <div class="closed-countdown" aria-live="off">
@@ -849,37 +576,40 @@
 
   <!-- picker view -->
   <div id="pickerView">
-    <div class="search-container">
-      <input type="text" id="searchInput" class="search-bar" placeholder="Search by name or channel ID...">
-      <button id="searchButton" class="search-button">Search</button>
+    <div class="search-container" role="search">
+      <svg class="icon"><use href="#i-search"/></svg>
+      <input type="search" id="searchInput" class="search-bar" placeholder="Search by name or channel ID" aria-label="Search channels" autocomplete="off" spellcheck="false">
     </div>
-    <div class="loading" id="loading"><span class="spinner"></span> Loading channels...</div>
-    <div class="grid" id="channelGrid"></div>
+    <p class="result-count" id="resultCount" aria-live="polite"></p>
+    <div class="grid" id="channelGrid">
+      <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+      <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+    </div>
     <p class="empty-state" id="emptyState" style="display: none;">No channels found.</p>
   </div>
 
   <!-- auth view -->
   <div class="grind-panel" id="authView">
-    <button class="change-channel" id="authChangeChannelBtn"><i class="fa-solid fa-arrow-left"></i> Change channel</button>
+    <button class="change-channel" id="authChangeChannelBtn" type="button"><svg class="icon"><use href="#i-back"/></svg> Change channel</button>
     <div class="avatar" id="authAvatar"></div>
     <p class="channel-name" id="authChannelName"></p>
     <p class="auth-hint" id="authHint">Checking this channel...</p>
 
     <form class="auth-form" id="authForm">
-      <input type="password" id="authPasswordInput" placeholder="Password" autocomplete="current-password" minlength="6">
-      <input type="password" id="authConfirmInput" placeholder="Confirm password" autocomplete="new-password" minlength="6">
+      <input class="input" type="password" id="authPasswordInput" placeholder="Password" autocomplete="current-password" minlength="6">
+      <input class="input" type="password" id="authConfirmInput" placeholder="Confirm password" autocomplete="new-password" minlength="6">
       <p class="auth-hint" id="captchaQuestionLabel" style="margin:0;">Quick check: what's <strong id="captchaQuestion">...</strong>?</p>
-      <input type="text" inputmode="numeric" id="captchaAnswerInput" placeholder="Your answer" autocomplete="off">
-      <button type="submit" id="authSubmitButton"><i class="fa-solid fa-lock"></i> <span id="authSubmitLabel">Log in</span></button>
+      <input class="input" type="text" inputmode="numeric" id="captchaAnswerInput" placeholder="Your answer" autocomplete="off">
+      <button class="btn" type="submit" id="authSubmitButton"><svg class="icon"><use href="#i-lock"/></svg> <span id="authSubmitLabel">Log in</span></button>
     </form>
 
     <div class="claim-box" id="claimBox">
       <p class="auth-hint" style="margin:0;">While signed in to YouTube <strong>as this channel</strong>, type this in the FYSC live chat:</p>
       <p class="claim-code" id="claimCommand">!claim2 ......</p>
-      <button type="button" class="claim-copy" id="claimCopyBtn"><i class="fa-regular fa-copy"></i> Copy</button>
+      <button type="button" class="claim-copy" id="claimCopyBtn"><svg class="icon"><use href="#i-copy"/></svg> Copy</button>
       <div class="claim-google" id="claimGoogle">
         <p class="auth-hint" style="margin:0;">or</p>
-        <button type="button" class="google-btn" id="claimGoogleBtn"><i class="fa-brands fa-google"></i> Verify with Google instead</button>
+        <button type="button" class="btn secondary" id="claimGoogleBtn"><svg class="icon"><use href="#i-google"/></svg> Verify with Google instead</button>
       </div>
       <p class="auth-hint" id="claimWaitHint" style="margin:0;">Waiting for your message...</p>
     </div>
@@ -891,8 +621,8 @@
   <!-- grind view -->
   <div class="grind-panel" id="grindPanel">
     <div class="panel-header-row">
-      <button class="change-channel" id="changeChannelBtn"><i class="fa-solid fa-arrow-left"></i> Change channel</button>
-      <button class="logout-link" id="logoutBtn"><i class="fa-solid fa-right-from-bracket"></i> Log out</button>
+      <button class="change-channel" id="changeChannelBtn" type="button"><svg class="icon"><use href="#i-back"/></svg> Change channel</button>
+      <button class="logout-link" id="logoutBtn" type="button"><svg class="icon"><use href="#i-logout"/></svg> Log out</button>
     </div>
     <div class="avatar" id="grindAvatar"></div>
     <p class="channel-name" id="grindName"></p>
@@ -900,33 +630,30 @@
     <p class="grind-time" id="grindTimeLeft"></p>
 
     <div class="rename-row">
-      <input type="text" id="renameInput" class="rename-input" placeholder="New display name..." maxlength="60">
-      <button id="renameButton" class="rename-button" type="button"><i class="fa-solid fa-pen"></i> Rename</button>
+      <input type="text" id="renameInput" class="input" placeholder="New display name" maxlength="60" aria-label="New display name">
+      <button id="renameButton" class="btn secondary" type="button"><svg class="icon"><use href="#i-pen"/></svg> Rename</button>
     </div>
 
-    <button class="boost-btn" id="boostButton">
-      <i class="fa-solid fa-bolt"></i>
+    <button class="boost-btn" id="boostButton" type="button">
+      <svg class="icon solid"><use href="#i-bolt"/></svg>
       <span id="boostLabel">Boost</span>
-      <span class="sub">(5 minute cooldown)</span>
+      <span class="sub">5 minute cooldown</span>
     </button>
 
-    <p class="section-label spaced">Content commands</p>
+    <p class="section-label">Content commands</p>
     <div class="command-grid" id="commandGrid"></div>
-
-    <p class="section-label spaced">Halloween event</p>
-    <div class="command-grid" id="halloweenGrid"></div>
 
     <div class="grind-check" id="grindCheck">
       <p class="auth-hint" style="margin:0;">Quick check to keep grinding: what's <strong id="grindCheckQuestion">...</strong>?</p>
       <div class="rename-row" style="margin-bottom:0;">
-        <input type="text" inputmode="numeric" id="grindCheckAnswer" class="rename-input" placeholder="Your answer" autocomplete="off">
-        <button type="button" id="grindCheckButton" class="rename-button"><i class="fa-solid fa-check"></i> Submit</button>
+        <input type="text" inputmode="numeric" id="grindCheckAnswer" class="input" placeholder="Your answer" autocomplete="off" aria-label="Answer">
+        <button type="button" id="grindCheckButton" class="btn"><svg class="icon"><use href="#i-check"/></svg> Submit</button>
       </div>
     </div>
 
-    <p class="status-line" id="statusLine"></p>
-    <a class="live-link" id="liveLink" href="#" target="_blank">
-      <i class="fa-solid fa-chart-line"></i> Watch live subcount
+    <p class="status-line" id="statusLine" role="status" aria-live="polite"></p>
+    <a class="live-link" id="liveLink" href="#" target="_blank" rel="noopener">
+      <svg class="icon"><use href="#i-chart"/></svg> Watch live subcount
     </a>
 
     <div class="other-commands">
@@ -940,8 +667,10 @@
 
     <!-- Bump the version and put the newest change at the top on each update. -->
     <div class="latest-updates">
-      <p class="section-label">Latest updates (1.1)</p>
+      <p class="section-label">Latest updates (1.2)</p>
       <ul>
+        <li><strong>New look</strong> — a cleaner design that follows your device's light or dark mode, and loads much faster.</li>
+        <li><strong>Live search</strong> — the channel list filters as you type.</li>
         <li><strong>Grind time limit</strong> — each channel gets 12 hours of grinding in any 24 hours. Time left shows under the subscriber count.</li>
         <li><strong>Shared cooldown</strong> — sending a command locks all the command buttons until its cooldown ends. Boost keeps its own 5-minute cooldown.</li>
         <li><strong>Quick checks</strong> — a short math question now and then while grinding, to stop macros.</li>
@@ -950,9 +679,9 @@
     </div>
   </div>
 
-  <script src="/config.js"></script>
   <script>
-    // Fetched straight from fysca's public, keyless endpoint (see config.js).
+    // Fetched straight from fysca's public, keyless endpoint (see config.js,
+    // loaded in <head>, which also starts this download early).
     const DATA_ENDPOINT = window.FYSC_DATA_URL;
 
     // POST /web/post/:cid { type, gain } -- same effect as the generic /post
@@ -1018,13 +747,19 @@
     // :type on this route.
     const BOOST_COMMAND = { type: 'boost', gain: 50000, label: 'Boost', cooldownSeconds: 300 };
 
-    const HALLOWEEN_COMMANDS = [
-      { type: 'jackolantern', gain: 20000, label: 'Jack-o-lantern' },
-      { type: 'trickortreat', gain: 25000, label: 'Trick or Treat' },
-      { type: 'halloween', gain: 45000, label: 'Halloween' }
-    ];
+    // The Halloween commands (jackolantern, trickortreat, halloween) ended:
+    // the grind proxy refuses them (BLOCKED_COMMANDS), so they aren't shown.
 
     const STORAGE_KEY = 'fysc_grind_cid';
+
+    // localStorage can throw (private mode, blocked site data). The page
+    // still works then, it just won't remember the last channel.
+    function storageGet(key) {
+      try { return localStorage.getItem(key); } catch (e) { return null; }
+    }
+    function storageSet(key, value) {
+      try { localStorage.setItem(key, value); } catch (e) { /* ignore */ }
+    }
     const TOKEN_KEY_PREFIX = 'fysc_grind_token_';
 
     // One password-only login per channel (no username -- the channel's
@@ -1032,10 +767,10 @@
     // specific cid and rejected if replayed against another, so they're
     // stored per-cid here too rather than as one shared value.
     function getStoredToken(cid) {
-      try { return localStorage.getItem(TOKEN_KEY_PREFIX + cid); } catch (e) { return null; }
+      return storageGet(TOKEN_KEY_PREFIX + cid);
     }
     function setStoredToken(cid, token) {
-      try { localStorage.setItem(TOKEN_KEY_PREFIX + cid, token); } catch (e) { /* ignore */ }
+      storageSet(TOKEN_KEY_PREFIX + cid, token);
     }
     function clearStoredToken(cid) {
       try { localStorage.removeItem(TOKEN_KEY_PREFIX + cid); } catch (e) { /* ignore */ }
@@ -1067,7 +802,6 @@
     const claimGoogleBtn = document.getElementById('claimGoogleBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     const grindPanel = document.getElementById('grindPanel');
-    const loading = document.getElementById('loading');
     const emptyState = document.getElementById('emptyState');
     const channelGrid = document.getElementById('channelGrid');
     const grindAvatar = document.getElementById('grindAvatar');
@@ -1078,14 +812,14 @@
     const renameButton = document.getElementById('renameButton');
     const boostButton = document.getElementById('boostButton');
     const commandGrid = document.getElementById('commandGrid');
-    const halloweenGrid = document.getElementById('halloweenGrid');
     const statusLine = document.getElementById('statusLine');
     const grindCheck = document.getElementById('grindCheck');
     const grindCheckQuestion = document.getElementById('grindCheckQuestion');
     const grindCheckAnswer = document.getElementById('grindCheckAnswer');
     const grindCheckButton = document.getElementById('grindCheckButton');
     const liveLink = document.getElementById('liveLink');
-    const refreshBtn = document.getElementById('refreshBtn');
+    const searchInput = document.getElementById('searchInput');
+    const resultCount = document.getElementById('resultCount');
 
     function formatNumber(num) {
       return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -1095,12 +829,17 @@
       return name.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
     }
 
-    function setAvatar(el, channel) {
+    // Avatars below the fold only download when scrolled near, and decode
+    // off the main thread, so 100+ channel pictures don't hold up the page.
+    function setAvatar(el, channel, size) {
       el.innerHTML = '';
       if (channel.cimage) {
         const img = document.createElement('img');
         img.src = channel.cimage;
-        img.alt = channel.cname;
+        img.alt = '';
+        img.width = img.height = size || 44;
+        img.loading = 'lazy';
+        img.decoding = 'async';
         img.onerror = () => { el.textContent = initials(channel.cname); };
         el.appendChild(img);
       } else {
@@ -1110,6 +849,10 @@
 
     function displayChannels(channels) {
       channelGrid.innerHTML = '';
+      const query = searchInput.value.trim();
+      resultCount.textContent = query
+        ? channels.length + (channels.length === 1 ? ' match' : ' matches')
+        : channels.length + ' channels';
 
       if (channels.length === 0) {
         emptyState.style.display = 'block';
@@ -1117,6 +860,8 @@
       }
       emptyState.style.display = 'none';
 
+      // Built off-screen and added in one go: one layout instead of 100+.
+      const fragment = document.createDocumentFragment();
       channels.forEach(channel => {
         const card = document.createElement('button');
         card.className = 'pick-card';
@@ -1127,6 +872,7 @@
         setAvatar(avatar, channel);
 
         const info = document.createElement('div');
+        info.className = 'info';
         const name = document.createElement('div');
         name.className = 'name';
         name.textContent = channel.cname;
@@ -1144,25 +890,31 @@
         card.appendChild(info);
         card.addEventListener('click', () => selectChannel(channel));
 
-        channelGrid.appendChild(card);
+        fragment.appendChild(card);
       });
+      channelGrid.appendChild(fragment);
     }
 
     // Matches by display name OR channel ID -- names collide/are hard to
     // recall exactly, but a channel ID is unique, so pasting it in is a
     // reliable way to jump straight to your own channel in a long list.
+    // Filters as you type (short debounce), Enter applies it immediately.
     function searchChannels() {
-      const query = document.getElementById('searchInput').value.toLowerCase().trim();
+      const query = searchInput.value.toLowerCase().trim();
       const filtered = allChannels.filter(channel =>
-        channel.cname.toLowerCase().includes(query) ||
-        channel.cid.toLowerCase().includes(query)
+        String(channel.cname || '').toLowerCase().includes(query) ||
+        String(channel.cid || '').toLowerCase().includes(query)
       );
       displayChannels(filtered);
     }
 
-    document.getElementById('searchButton').addEventListener('click', searchChannels);
-    document.getElementById('searchInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') searchChannels();
+    let searchTimer = null;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(searchChannels, 120);
+    });
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { clearTimeout(searchTimer); searchChannels(); }
     });
 
     function setStatus(text, kind) {
@@ -1312,6 +1064,21 @@
       refreshCommandButtons();
     }, 1000);
 
+    // A 429 comes from one of two places:
+    //   the grind proxy -> JSON { kind, retryAfterSeconds, message }
+    //   the FYSC server -> text "Slow down! Try again in 3s." /
+    //                      "Too many grinds this minute. Try again in 12s."
+    function parseLimit(text) {
+      try {
+        const data = JSON.parse(text);
+        if (data && typeof data === 'object') {
+          return { seconds: Number(data.retryAfterSeconds) || 0, message: data.message || '' };
+        }
+      } catch (e) { /* plain text */ }
+      const match = text.match(/(\d+)\s*s\b/);
+      return { seconds: match ? parseInt(match[1], 10) : 0, message: /too many|slow down/i.test(text) ? text : '' };
+    }
+
     async function doCommand(cmd, btn, labelEl) {
       if (!selectedChannel || btn.disabled) return;
       const lock = lockFor(cmd);
@@ -1342,12 +1109,26 @@
         }
 
         if (response.status === 429) {
-          const match = text.match(/(\d+)s/);
-          const wait = match ? parseInt(match[1], 10) : (cmd.cooldownSeconds || 5);
-          // Either this command's own cooldown or the per-minute cap
-          // across all commands -- the server's text says which.
-          setStatus(text.indexOf('Too many') !== -1 ? text : cmd.label + ' is on cooldown — try again in ' + wait + 's', 'wait');
+          const limit = parseLimit(text);
+          const wait = limit.seconds || cmd.cooldownSeconds || 5;
+          // The proxy's shared cooldown / post-boost pause (JSON), the
+          // server's per-command cooldown or its per-minute cap (text) --
+          // whichever it was, show its own message.
+          setStatus(limit.message || (cmd.label + ' is on cooldown — try again in ' + wait + 's'), 'wait');
           startCooldown(lock, btn, labelEl, wait);
+          return;
+        }
+
+        if (response.status === 503) {   // the proxy before opening day: "Grinding opens <ISO date>."
+          const opens = Date.parse((text.match(/\d{4}-\d\d-\d\dT[\d:.]+Z/) || [''])[0]);
+          setStatus('Grinding isn’t open yet' + (opens
+            ? ' — it opens ' + new Date(opens).toLocaleString(undefined, { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + '.'
+            : '. Try again soon.'), 'err');
+          return;
+        }
+
+        if (response.status === 400 && /unknown command/i.test(text)) {
+          setStatus(cmd.label + ' isn’t available right now.', 'err');
           return;
         }
 
@@ -1466,7 +1247,6 @@
     }
 
     CONTENT_COMMANDS.forEach(cmd => commandGrid.appendChild(createCommandButton(cmd)));
-    HALLOWEEN_COMMANDS.forEach(cmd => halloweenGrid.appendChild(createCommandButton(cmd)));
 
     boostButton.dataset.label = 'Boost';
     boostButton.addEventListener('click', () => doCommand(BOOST_COMMAND, boostButton, boostLabel));
@@ -1479,7 +1259,7 @@
     // view anyway (see doCommand/doRename).
     function selectChannel(channel) {
       selectedChannel = channel;
-      localStorage.setItem(STORAGE_KEY, channel.cid);
+      storageSet(STORAGE_KEY, channel.cid);
 
       if (getStoredToken(channel.cid)) {
         revealGrindPanel(channel);
@@ -1489,7 +1269,7 @@
     }
 
     function revealGrindPanel(channel) {
-      setAvatar(grindAvatar, channel);
+      setAvatar(grindAvatar, channel, 72);
       grindName.textContent = channel.cname;
       grindSubs.textContent = formatNumber(channel.subscriberCountRealAPI) + ' subscribers';
       liveLink.href = '/subs?fyscChannel=' + encodeURIComponent(channel.cid);
@@ -1626,7 +1406,7 @@
       selectedChannel = channel;
       currentClaimToken = null;
       stopClaimPolling();
-      setAvatar(authAvatar, channel);
+      setAvatar(authAvatar, channel, 72);
       authChannelName.textContent = channel.cname;
       setAuthStatus('');
       authForm.style.display = 'none';
@@ -1758,11 +1538,11 @@
     claimCopyBtn.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(claimCommand.textContent);
-        claimCopyBtn.innerHTML = '<i class="fa-solid fa-check"></i> Copied';
+        claimCopyBtn.innerHTML = '<svg class="icon"><use href="#i-check"/></svg> Copied';
       } catch (e) {
         claimCopyBtn.textContent = 'Select the text above to copy it';
       }
-      setTimeout(() => { claimCopyBtn.innerHTML = '<i class="fa-regular fa-copy"></i> Copy'; }, 2000);
+      setTimeout(() => { claimCopyBtn.innerHTML = '<svg class="icon"><use href="#i-copy"/></svg> Copy'; }, 2000);
     });
 
     document.getElementById('authChangeChannelBtn').addEventListener('click', () => {
@@ -1837,51 +1617,41 @@
       if (e.key === 'Enter') doRename();
     });
 
-    // Mirrors !refresh2 -- available to everyone, doesn't touch any single
-    // channel's data, so it works without a channel being selected at all.
-    refreshBtn.addEventListener('click', async () => {
-      refreshBtn.disabled = true;
-      const original = refreshBtn.innerHTML;
-      try {
-        await fetch(window.FYSC_API_BASE + '/refresh');
-        refreshBtn.innerHTML = '<i class="fa-solid fa-check"></i> Refresh scheduled!';
-      } catch (err) {
-        console.error('Refresh failed:', err);
-        refreshBtn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Failed, try again';
-      }
-      setTimeout(() => {
-        refreshBtn.disabled = false;
-        refreshBtn.innerHTML = original;
-      }, 5000);
-    });
+    // (The "Refresh chart" button is gone: /refresh isn't on the grind
+    // proxy's allowlist, so it could never work from this site -- it only
+    // ever showed "Refresh scheduled!" while the proxy answered 404.)
 
     async function loadChannels() {
-      loading.style.display = 'flex';
-
       try {
-        const response = await fetch(DATA_ENDPOINT);
+        // Reuse the request <head> already started; fall back to a new one.
+        let response = window.__channelList ? await window.__channelList : null;
+        window.__channelList = null;
+        if (!response || !(response instanceof Response)) response = await fetch(DATA_ENDPOINT);
         if (!response.ok) throw new Error('HTTP ' + response.status);
         const data = await response.json();
         if (!Array.isArray(data)) throw new Error('Unexpected response shape');
 
-        allChannels = data.slice().sort((a, b) => b.subscriberCountRealAPI - a.subscriberCountRealAPI);
-        displayChannels(allChannels);
+        allChannels = data
+          .filter(c => c && c.cid)
+          .sort((a, b) => b.subscriberCountRealAPI - a.subscriberCountRealAPI);
+        if (searchInput.value.trim()) searchChannels(); else displayChannels(allChannels);
 
-        const rememberedCid = localStorage.getItem(STORAGE_KEY);
+        const rememberedCid = storageGet(STORAGE_KEY);
         if (rememberedCid) {
           const remembered = allChannels.find(c => c.cid === rememberedCid);
           if (remembered) selectChannel(remembered);
         }
       } catch (err) {
         console.error('Error fetching channels:', err);
-        emptyState.textContent = 'Failed to load channels. Is the API running?';
+        channelGrid.innerHTML = '';
+        resultCount.textContent = '';
+        emptyState.textContent = "Couldn't load the channel list. Check your connection and refresh the page.";
         emptyState.style.display = 'block';
-      } finally {
-        loading.style.display = 'none';
       }
     }
 
-    loadChannels();
+    // Before opening day only the closed card shows, so don't load anything.
+    if (!document.documentElement.classList.contains('is-closed')) loadChannels();
   </script>
 </body>
 </html>
