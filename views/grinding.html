@@ -1304,22 +1304,47 @@
       }
     }
 
-    // Human check for the server's anti-macro gate: same arithmetic captcha
-    // as login, answered through /web/grind-check/:cid. A wrong answer gets
-    // a fresh question, since each captcha token only works once.
+    // Human check for the server's anti-macro gate, answered through
+    // /web/grind-check/:cid. The question comes as a picture (no text in the
+    // page for a script to read), and only a real keyboard can answer it:
+    // typing, clicks and Enter made by a script (isTrusted false) are ignored.
+    // A wrong answer gets a fresh question, since each token only works once.
     let grindCheckToken = null;
+    let grindCheckTyped = false;
 
     async function showGrindCheck() {
       grindCheck.classList.add('show');
       grindCheckAnswer.value = '';
+      grindCheckTyped = false;
       grindCheckQuestion.textContent = '...';
       grindCheckToken = null;
+      const channel = selectedChannel;
+      if (!channel) return;
       try {
-        const response = await fetch(window.FYSC_API_BASE + '/auth/captcha');
+        const response = await fetch(window.FYSC_API_BASE + '/web/grind-check/' + encodeURIComponent(channel.cid), { headers: authHeaders(channel.cid), cache: 'no-store' });
+        if (response.status === 401 || response.status === 403) {
+          clearStoredToken(channel.cid);
+          hideGrindCheck();
+          setStatus('Your login expired. Log in again.', 'err');
+          showAuthView(channel);
+          return;
+        }
+        if (response.status === 409) {   // no check is due any more (e.g. the server restarted)
+          hideGrindCheck();
+          setStatus('No check needed any more. Keep grinding!', 'ok');
+          return;
+        }
+        if (!response.ok) throw new Error('HTTP ' + response.status);
         const data = await response.json();
         grindCheckToken = data.token;
-        grindCheckQuestion.textContent = data.question;
+        const img = new Image();
+        img.alt = 'Check question';
+        img.draggable = false;
+        img.style.cssText = 'height:40px;vertical-align:middle;border-radius:8px;';
+        img.src = data.image;
+        grindCheckQuestion.replaceChildren(img);
       } catch (err) {
+        grindCheckQuestion.textContent = '?';
         setStatus("Couldn't load the check. Try again.", 'err');
       }
       grindCheckAnswer.focus();
@@ -1332,6 +1357,8 @@
 
     async function submitGrindCheck() {
       if (!selectedChannel || !grindCheckToken || grindCheckButton.disabled) return;
+      if (!grindCheckAnswer.value.trim()) { setStatus('Type your answer first.', 'err'); return; }
+      if (!grindCheckTyped) { setStatus('Please type the answer yourself.', 'err'); return; }
       grindCheckButton.disabled = true;
       try {
         const response = await fetch(window.FYSC_API_BASE + '/web/grind-check/' + encodeURIComponent(selectedChannel.cid), {
@@ -1352,7 +1379,8 @@
           hideGrindCheck();
           setStatus('Thanks! Keep grinding.', 'ok');
         } else {
-          setStatus('Wrong answer. Try this one.', 'err');
+          const text = await response.text();
+          setStatus(/too fast/i.test(text) ? 'That was too fast. Read the new question and try again.' : 'Wrong answer. Try this one.', 'err');
           showGrindCheck();
         }
       } catch (err) {
@@ -1363,9 +1391,10 @@
       }
     }
 
-    grindCheckButton.addEventListener('click', submitGrindCheck);
+    grindCheckAnswer.addEventListener('input', (e) => { if (e.isTrusted) grindCheckTyped = true; });
+    grindCheckButton.addEventListener('click', (e) => { if (e.isTrusted) submitGrindCheck(); });
     grindCheckAnswer.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') submitGrindCheck();
+      if (e.key === 'Enter' && e.isTrusted) submitGrindCheck();
     });
 
     function createCommandButton(cmd) {
@@ -1384,7 +1413,7 @@
 
       btn.appendChild(name);
       btn.appendChild(hint);
-      btn.addEventListener('click', () => doCommand(cmd, btn, name));
+      btn.addEventListener('click', (e) => { if (e.isTrusted) doCommand(cmd, btn, name); });   // scripted clicks are ignored
       if (cmd.ownLock) viralButton = btn; else gridButtons.push(btn);
       return btn;
     }
@@ -1392,7 +1421,7 @@
     CONTENT_COMMANDS.forEach(cmd => commandGrid.appendChild(createCommandButton(cmd)));
 
     boostButton.dataset.label = 'Boost';
-    boostButton.addEventListener('click', () => doCommand(BOOST_COMMAND, boostButton, boostLabel));
+    boostButton.addEventListener('click', (e) => { if (e.isTrusted) doCommand(BOOST_COMMAND, boostButton, boostLabel); });   // scripted clicks are ignored
 
     // Picking a channel no longer drops straight into the grind panel --
     // every channel needs a password-only login (no username; the cid is
