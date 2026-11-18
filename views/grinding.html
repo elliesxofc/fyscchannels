@@ -710,6 +710,9 @@
   </div>
 
   <script>
+    // Everything below runs inside its own scope, so doCommand, submitGrindCheck
+    // and friends are not globals a console or userscript can call directly.
+    (function () {
     // Fetched straight from fysca's public, keyless endpoint (see config.js,
     // loaded in <head>, which also starts this download early).
     const DATA_ENDPOINT = window.FYSC_DATA_URL;
@@ -1825,6 +1828,7 @@
 
     // Before opening day only the closed card shows, so don't load anything.
     if (!document.documentElement.classList.contains('is-closed')) loadChannels();
+    })();
   </script>
 </body>
 </html>
