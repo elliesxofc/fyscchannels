@@ -694,9 +694,10 @@
 
     <!-- Bump the version and put the newest change at the top on each update. -->
     <div class="latest-updates">
-      <p class="section-label">Latest updates (1.2)</p>
+      <p class="section-label">Latest updates (1.3)</p>
       <ul>
-        <li><strong>Grinding method</strong> — shows whether a channel grinds from chat or the website. Switching is turned off for now: chat commands and the buttons both work.</li>
+        <li><strong>Grinding method switch</strong> — pick Chat or Website for your channel. Chat: use the Nightbot commands (the buttons are locked). Website: use the buttons (the chat commands are off). Switch any time with the button, or <strong>!switch</strong> in chat.</li>
+        <li><strong>Anti-macro</strong> — auto-clickers, macro recorders and emulator macros (MSI App Player / BlueStacks) are detected. Channels that use them are paused from website grinding.</li>
         <li><strong>More commands</strong> — Short, Music Video, Phonk, Song, Meme, Moai and Viral (Viral has its own 5-minute cooldown, like Boost).</li>
         <li><strong>Real amounts</strong> — each button now shows the most it can give in Season 10 (commands give a random amount up to half the old number).</li>
         <li><strong>New look</strong> — a cleaner design that follows your device's light or dark mode, and loads much faster.</li>
@@ -735,6 +736,106 @@
     // cooldown regardless of what this page does.
     function commandUrl(cid) {
       return window.FYSC_API_BASE + '/web/post/' + encodeURIComponent(cid);
+    }
+
+    // ---- how a command button was pressed: sent with every command for the grind proxy's anti-bot check ----
+    // (same as the TNStats grind page) Only real (isTrusted) pointer events are counted. The proxy strips this
+    // before the FYSC server sees the command.
+    const pointerInput = { moves: [], path: [], down: null };
+    addEventListener('pointermove', (e) => {
+      if (!e.isTrusted) return;
+      const t = performance.now();
+      pointerInput.moves.push(t);
+      if (pointerInput.moves.length > 64) pointerInput.moves.shift();
+      pointerInput.path.push({ t: t, x: e.clientX, y: e.clientY });
+      if (pointerInput.path.length > 64) pointerInput.path.shift();
+    }, { capture: true, passive: true });
+    addEventListener('pointerdown', (e) => {
+      if (!e.isTrusted) return;
+      const t = performance.now();
+      // how far the pointer travelled in the 1.5s before the press (px)
+      let tr = 0, last = null;
+      for (const m of pointerInput.path) { if (m.t <= t - 1500 || m.t > t) continue; if (last) tr += Math.hypot(m.x - last.x, m.y - last.y); last = m; }
+      if (last) tr += Math.hypot(e.clientX - last.x, e.clientY - last.y);
+      pointerInput.down = { t: t, type: e.pointerType || 'mouse', x: e.clientX, y: e.clientY, w: e.width, h: e.height, p: e.pressure, tr: tr };
+    }, { capture: true, passive: true });
+    function isNativeFn(fn) {
+      try { return typeof fn === 'function' && /\{\s*\[native code\]\s*\}\s*$/.test(Function.prototype.toString.call(fn)); } catch (e) { return false; }
+    }
+    function clickSignals(e, btn) {
+      const now = performance.now(), d = pointerInput.down;
+      const h = { wd: navigator.webdriver === true ? 1 : 0, hl: 0, fp: isNativeFn(window.fetch) && isNativeFn(XMLHttpRequest.prototype.open) ? 0 : 1 };
+      try {
+        const brands = navigator.userAgentData && navigator.userAgentData.brands;
+        if (/Headless/i.test(navigator.userAgent) || (brands && brands.some(b => /Headless/i.test(b.brand)))) h.hl = 1;
+      } catch (er) { /* old browser */ }
+      if (!e || e.detail === 0 || !d || now - d.t > 3000) { h.k = 1; return h; }   // keyboard (Enter / Space), or no press seen
+      h.pt = d.type;
+      h.pd = Math.round(now - d.t);
+      h.mv = pointerInput.moves.filter(t => t > d.t - 1500 && t <= d.t).length;
+      const r = btn.getBoundingClientRect();
+      h.c = Math.abs(d.x - (r.left + r.width / 2)) < 1 && Math.abs(d.y - (r.top + r.height / 2)) < 1 ? 1 : 0;
+      // where in the button it was pressed, the contact size / pressure and any movement during the press (phone auto-clickers)
+      const clamp = (v, max) => Math.max(0, Math.min(max, Math.round(v)));
+      h.ox = clamp((d.x - r.left) * 100, 500000); h.oy = clamp((d.y - r.top) * 100, 500000);
+      if (Number.isFinite(d.w)) h.tw = clamp(d.w * 10, 10000);
+      if (Number.isFinite(d.h)) h.th = clamp(d.h * 10, 10000);
+      if (Number.isFinite(d.p)) h.tp = clamp(d.p * 1000, 1000);
+      h.um = Math.min(64, pointerInput.moves.filter(t => t > d.t && t <= now).length);
+      if (Number.isFinite(d.tr)) h.tr = clamp(d.tr, 1000000);
+      return h;
+    }
+
+    // One-time tickets from the grind proxy (from /grind/status and from every command answer). They only live in this
+    // scope, never in localStorage or on window, so a pasted script can't attach one to a command it makes up.
+    // Every tap waits in line for a ticket: a kept one, the one the next command answer brings, or (only when nothing is on its
+    // way) one fresh "seed" ticket, which goes to ONE waiting tap -- the others wait for the answer to that tap's command.
+    const grindTickets = new Map();   // cid -> [{ t, at }, ...]
+    const ticketWaiters = new Map();  // cid -> [{ ok, timer }, ...] in tap order
+    const ticketsInFlight = new Map(); // cid -> commands sent whose answer (and its ticket) has not come back yet
+    const seedFetch = new Map();      // cid -> the seed ticket request already on its way
+    const TICKET_KEEP_MS = 9 * 60000; // the proxy's tickets last 10 minutes; older ones are dropped here, not tried
+    const TICKET_WAIT_MS = 25000;     // a slow server answer can take 12s; a tap gives up after this
+    function freshTicket(cid) {
+      const list = grindTickets.get(cid) || [];
+      while (list.length) { const x = list.pop(); if (Date.now() - x.at < TICKET_KEEP_MS) return x.t; }
+      return '';
+    }
+    function keepTicket(cid, t) {
+      if (!t || typeof t !== 'string') return;
+      const list = grindTickets.get(cid) || [];
+      list.push({ t: t, at: Date.now() }); while (list.length > 6) list.shift();
+      grindTickets.set(cid, list);
+      pumpTickets(cid);
+    }
+    function pumpTickets(cid) {
+      const w = ticketWaiters.get(cid);
+      if (!w || !w.length) return;
+      while (w.length) { const t = freshTicket(cid); if (!t) break; const x = w.shift(); clearTimeout(x.timer); x.ok(t); }
+      if (!w.length || (ticketsInFlight.get(cid) || 0) > 0 || seedFetch.has(cid)) return;   // a ticket is already on its way
+      const p = fetch(window.FYSC_API_BASE + '/grind/status/' + encodeURIComponent(cid) + '?ticket=1', { headers: authHeaders(cid), cache: 'no-store' })
+        .then(r => r.json()).then(d => (d && typeof d.t === 'string' ? d.t : '')).catch(() => '')
+        .then((t) => {
+          if (t) keepTicket(cid, t);   // seedFetch is still set here, so the other waiting taps wait for this tap's answer
+          else { const all = ticketWaiters.get(cid) || []; ticketWaiters.delete(cid); all.forEach(x => { clearTimeout(x.timer); x.ok(''); }); }
+          seedFetch.delete(cid);
+          if (!(ticketsInFlight.get(cid) || 0)) setTimeout(() => pumpTickets(cid), 0);   // nothing got sent after all
+        });
+      seedFetch.set(cid, p);
+    }
+    function sentCommand(cid, d) {
+      const n = Math.max(0, (ticketsInFlight.get(cid) || 0) + d); ticketsInFlight.set(cid, n);
+      if (!n) pumpTickets(cid);   // no answer is coming any more: a waiting tap gets a seed ticket
+    }
+    function nextTicket(cid) {
+      const t = freshTicket(cid);
+      if (t) return Promise.resolve(t);
+      return new Promise((ok) => {
+        const x = { ok: ok, timer: 0 };
+        x.timer = setTimeout(() => { const w = ticketWaiters.get(cid) || []; const i = w.indexOf(x); if (i >= 0) { w.splice(i, 1); ok(''); } }, TICKET_WAIT_MS);
+        const w = ticketWaiters.get(cid) || []; w.push(x); ticketWaiters.set(cid, w);
+        pumpTickets(cid);
+      });
     }
 
     // The login token goes in a header rather than the URL, so it doesn't
@@ -988,12 +1089,9 @@
     // commands) or from these buttons, never both: the server stores the
     // choice per channel, Chat locks these buttons and Website turns the chat
     // commands off.
-    // The switch is OFF for now: it shows "Chat", can't be changed, makes no
-    // server calls, and the buttons keep working alongside the chat commands.
-    // To turn it on, set this to true -- but only once the Season 10 FYSC
-    // server has GET /grind-mode/:cid and POST /web/grind-mode/:cid (the
-    // grind proxy already forwards both).
-    const GRIND_MODE_SWITCH_ENABLED = false;
+    // The switch is ON: the FYSC server has GET /grind-mode/:cid, POST /web/grind-mode/:cid and the !switch
+    // chat command. Set this to false to go back to "chat and buttons both work" (the server must allow that too).
+    const GRIND_MODE_SWITCH_ENABLED = true;
     let grindMode = 'chat';
     const modeToggle = document.getElementById('modeToggle');
     const modeLabel = document.getElementById('modeLabel');
@@ -1212,14 +1310,14 @@
       try {
         const data = JSON.parse(text);
         if (data && typeof data === 'object') {
-          return { seconds: Number(data.retryAfterSeconds) || 0, message: data.message || '' };
+          return { seconds: Number(data.retryAfterSeconds) || 0, message: data.message || '', kind: data.kind || '' };
         }
       } catch (e) { /* plain text */ }
       const match = text.match(/(\d+)\s*s\b/);
       return { seconds: match ? parseInt(match[1], 10) : 0, message: /too many|slow down/i.test(text) ? text : '' };
     }
 
-    async function doCommand(cmd, btn, labelEl) {
+    async function doCommand(cmd, btn, labelEl, signals) {
       if (!selectedChannel || btn.disabled) return;
       const lock = lockFor(cmd);
       if (grindTimeLeftMs(selectedChannel.cid, Date.now()) <= 0) {
@@ -1234,12 +1332,35 @@
       setStatus('Sending ' + cmd.label + '...', 'wait');
 
       try {
-        const response = await fetch(commandUrl(selectedChannel.cid), {
-          method: 'POST',
-          headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders(selectedChannel.cid)),
-          body: JSON.stringify({ type: cmd.type, gain: cmd.gain })
-        });
-        const text = await response.text();
+        const channel = selectedChannel;
+        const h = signals || clickSignals(null, btn);
+        const sendOnce = async (fresh) => {
+          if (fresh) grindTickets.delete(channel.cid);   // the kept ones are too old: wait for a new one
+          const t = await nextTicket(channel.cid);
+          sentCommand(channel.cid, 1);
+          try {
+            const r = await fetch(commandUrl(channel.cid), {
+              method: 'POST',
+              headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders(channel.cid)),
+              body: JSON.stringify({ type: cmd.type, gain: cmd.gain, h: Object.assign({}, h, { t: t }) })
+            });
+            keepTicket(channel.cid, r.headers.get('X-Grind-Ticket'));
+            return r;
+          } finally { sentCommand(channel.cid, -1); }
+        };
+        // 428 from the grind proxy = the one-time ticket wasn't accepted (JSON kind "ticket"); from the FYSC server = its
+        // picture check (plain text).
+        const isTicketRefusal = (txt) => { try { const d = JSON.parse(txt); return !!d && d.kind === 'ticket'; } catch (e) { return false; } };
+        let response = await sendOnce(false);
+        let text = await response.text();
+        if (response.status === 428 && isTicketRefusal(text)) {   // ticket too old (phone slept, many tabs): get a new one, try once more
+          response = await sendOnce(true);
+          text = await response.text();
+        }
+        if (response.status === 428 && isTicketRefusal(text)) {
+          setStatus("That tap didn't go through. Wait a few seconds and tap again (refresh the page if it keeps happening).", 'err');
+          return;
+        }
 
         // The server's anti-macro check wants a human answer first.
         if (response.status === 428) {
@@ -1250,6 +1371,11 @@
 
         if (response.status === 429) {
           const limit = parseLimit(text);
+          if (limit.kind === 'bot' || limit.kind === 'bot-pause' || limit.kind === 'captcha') {   // the grind proxy's anti-bot rules (scripts / macros)
+            setStatus(limit.message || 'Scripts and macros are not allowed.', 'err');
+            if (limit.kind === 'bot-pause') startCooldown(lock, btn, labelEl, limit.seconds || 60);
+            return;
+          }
           const wait = limit.seconds || cmd.cooldownSeconds || 5;
           // The proxy's shared cooldown / post-boost pause (JSON), the
           // server's per-command cooldown or its per-minute cap (text) --
@@ -1416,7 +1542,7 @@
 
       btn.appendChild(name);
       btn.appendChild(hint);
-      btn.addEventListener('click', (e) => { if (e.isTrusted) doCommand(cmd, btn, name); });   // scripted clicks are ignored
+      btn.addEventListener('click', (e) => { if (e.isTrusted) doCommand(cmd, btn, name, clickSignals(e, btn)); });   // scripted clicks are ignored
       if (cmd.ownLock) viralButton = btn; else gridButtons.push(btn);
       return btn;
     }
@@ -1424,7 +1550,7 @@
     CONTENT_COMMANDS.forEach(cmd => commandGrid.appendChild(createCommandButton(cmd)));
 
     boostButton.dataset.label = 'Boost';
-    boostButton.addEventListener('click', (e) => { if (e.isTrusted) doCommand(BOOST_COMMAND, boostButton, boostLabel); });   // scripted clicks are ignored
+    boostButton.addEventListener('click', (e) => { if (e.isTrusted) doCommand(BOOST_COMMAND, boostButton, boostLabel, clickSignals(e, boostButton)); });   // scripted clicks are ignored
 
     // Picking a channel no longer drops straight into the grind panel --
     // every channel needs a password-only login (no username; the cid is
@@ -1460,7 +1586,7 @@
       authView.style.display = 'none';
       grindPanel.style.display = 'flex';
       renderGrindTimeLeft(Date.now());
-      loadMode(channel);   // just shows "Chat" while the switch is turned off
+      loadMode(channel);
       refreshCommandButtons();
     }
 
